@@ -65,7 +65,18 @@ def get_abb_csv_path():
 
 
 def load_training_data():
-    """Load training data from local file or remote source."""
+    """Load training data from database, local file, or remote source."""
+    # First try database
+    try:
+        from models import TrainingData
+        df = TrainingData.get_all_as_dataframe()
+        if len(df) > 0:
+            print(f"📊 Loaded {len(df)} training examples from database")
+            return df
+    except Exception as e:
+        print(f"⚠️  Database not available, trying fallback: {e}")
+    
+    # Fallback to CSV sources
     path = get_training_csv_path()
     if path == "REMOTE_TRAINING_DATA":
         return remote_loader.load_training_data()

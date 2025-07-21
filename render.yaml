@@ -10,4 +10,14 @@ services:
         value: 3.11.9
       - key: PORT
         generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: abb-product-search-db
+          property: connectionString
     healthCheckPath: /api/health
+
+databases:
+  - name: abb-product-search-db
+    databaseName: abb_product_search
+    user: abb_user
+    plan: free
