@@ -15,7 +15,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-from fuzzywuzzy import fuzz
+from rapidfuzz import fuzz
 import joblib
 
 class ProbabilisticProductMatcher:
