@@ -154,7 +154,7 @@ def api_catalog_search():
     try:
         data = request.get_json()
         query = data.get('query', '').strip()
-        top_k = min(data.get('top_k', 10), 50)  # Allow more results for catalog search
+        top_k = min(data.get('top_k', 10), 3000)  # Allow up to 3000 results for catalog search
         
         if not query:
             return jsonify({
@@ -218,8 +218,8 @@ def perform_catalog_fuzzy_search(query, catalog_df, top_k):
         # Use the higher score
         max_score = max(desc_score, code_score)
         
-        # Only include results with reasonable similarity (>= 60%)
-        if max_score >= 60:
+        # Only include results with reasonable similarity (>= 30% for broader search)
+        if max_score >= 30:
             # Find the actual matched words
             matched_text = description if desc_score > code_score else order_code
             # Extract the matched words/phrases

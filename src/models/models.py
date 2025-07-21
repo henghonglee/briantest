@@ -155,6 +155,17 @@ class TrainingData(db.Model):
             base_query = base_query.limit(limit)
         
         return base_query.all()
+    
+    @classmethod
+    def clear_all(cls):
+        """Delete all training data records."""
+        try:
+            cls.query.delete()
+            db.session.commit()
+            return True
+        except Exception as e:
+            db.session.rollback()
+            raise e
 
 
 def init_db(app):

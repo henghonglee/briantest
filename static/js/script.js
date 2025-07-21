@@ -44,7 +44,8 @@ document.addEventListener('DOMContentLoaded', function() {
 // Main search function
 async function performSearch() {
     const query = searchInput.value.trim();
-    const topK = parseInt(resultsCount.value);
+    const topK = 20; // Fixed at 20 results for training search
+    const catalogTopK = 3000; // Allow up to 3000 for catalog search
     
     if (!query) {
         showError('Please enter a search query');
@@ -79,7 +80,7 @@ async function performSearch() {
                 },
                 body: JSON.stringify({
                     query: query,
-                    top_k: topK
+                    top_k: catalogTopK
                 })
             })
         ]);
@@ -219,12 +220,6 @@ function createResultElement(result, rank, type = 'training') {
                 </div>
             ` : ''}
             
-            <div class="detail-item">
-                <span class="detail-label">Scores</span>
-                <span class="detail-value">
-                    ${scoreDisplay}
-                </span>
-            </div>
         </div>
     `;
     
