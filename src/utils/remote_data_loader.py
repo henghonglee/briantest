@@ -8,8 +8,8 @@ class RemoteDataLoader:
     def __init__(self):
         # GitHub raw URLs for data files
         self.base_url = "https://raw.githubusercontent.com/henghonglee/briantest/main"
-        self.training_url = f"{self.base_url}/training/training.csv"
-        self.catalog_url = f"{self.base_url}/ABB.csv"
+        self.training_url = f"{self.base_url}/data/training/training.csv"
+        self.catalog_url = f"{self.base_url}/data/ABB.csv"
         
         # Cache settings
         self.cache_timeout = 300  # 5 minutes
