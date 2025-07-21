@@ -909,8 +909,8 @@ def process_excel():
                     col_index = df.columns.get_loc(query_col)
                     
                     # Create new column names
-                    order_code_col = f"{query_col}_Order_Code"
-                    description_col = f"{query_col}_Description" 
+                    order_code_col = "Order Code"
+                    description_col = "Description" 
                     match_info_col = f"{query_col}_Match_Info"
                     
                     # Initialize new columns
@@ -955,8 +955,8 @@ def process_excel():
                     new_column_order.append(col)
                     if str(col).lower().strip() == 'customer query':
                         # Add the new columns right after this Customer Query column
-                        order_code_col = f"{col}_Order_Code"
-                        description_col = f"{col}_Description"
+                        order_code_col = "Order Code"
+                        description_col = "Description"
                         match_info_col = f"{col}_Match_Info"
                         if order_code_col in processed_df.columns:
                             new_column_order.extend([order_code_col, description_col, match_info_col])
