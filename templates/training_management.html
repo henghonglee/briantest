@@ -189,8 +189,6 @@
             <div style="margin-bottom: 15px;">
                 <button class="btn btn-primary" onclick="loadTrainingData()">🔄 Refresh Data</button>
                 <button class="btn btn-secondary" onclick="exportTrainingData()">📥 Export Training Data</button>
-                <button class="btn btn-info" onclick="downloadModelFiles()">📦 Download Model Files</button>
-                <button class="btn btn-warning" onclick="syncRemoteData()">🔄 Sync Remote Data</button>
             </div>
             
             <div class="loading" id="dataLoading">
@@ -513,57 +511,7 @@
             }
         }
 
-        function syncRemoteData() {
-            if (confirm('Sync with remote training data? This will merge new data with existing data.')) {
-                fetch('/api/sync_remote_training_data', {
-                    method: 'POST'
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        showAlert(`✅ ${data.message} - Added ${data.rows_added} new rows`, 'success');
-                        loadTrainingData();
-                    } else {
-                        showAlert(`❌ Sync failed: ${data.error}`, 'error');
-                    }
-                })
-                .catch(error => {
-                    showAlert(`❌ Sync failed: ${error.message}`, 'error');
-                });
-            }
-        }
 
-        function downloadModelFiles() {
-            fetch('/api/model_files')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        // Create a zip file with all model files
-                        const files = data.files;
-                        if (files.length === 0) {
-                            showAlert('❌ No model files found to download', 'info');
-                            return;
-                        }
-                        
-                        // Download each file
-                        files.forEach(file => {
-                            const a = document.createElement('a');
-                            a.href = file.url;
-                            a.download = file.name;
-                            document.body.appendChild(a);
-                            a.click();
-                            document.body.removeChild(a);
-                        });
-                        
-                        showAlert(`✅ Downloading ${files.length} model files...`, 'success');
-                    } else {
-                        showAlert(`❌ Failed to get model files: ${data.error}`, 'error');
-                    }
-                })
-                .catch(error => {
-                    showAlert(`❌ Failed to get model files: ${error.message}`, 'error');
-                });
-        }
 
         function escapeHtml(text) {
             const div = document.createElement('div');

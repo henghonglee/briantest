@@ -161,9 +161,6 @@ function displayCombinedResults(trainingData, catalogData, query) {
     
     // Show results section
     resultsSection.style.display = 'block';
-    
-    // Scroll to results
-    resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 // Create individual result element
