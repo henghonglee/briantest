@@ -54,24 +54,16 @@ class ProbabilisticProductMatcher:
         """Load training data and product catalog."""
         print("Loading training data...")
         
-        # Load training data using resource utils
-        try:
-            from resource_utils import load_training_data
-            self.training_data = load_training_data()
-        except FileNotFoundError:
-            print("⚠️  Training data not found, creating empty dataset...")
-            # Create empty training data structure
-            self.training_data = pd.DataFrame(columns=['Customer Query', 'Order Code', 'Description'])
-        except Exception as e:
-            print(f"⚠️  Could not load training data: {e}")
-            self.training_data = pd.DataFrame(columns=['Customer Query', 'Order Code', 'Description'])
+        # Skip loading training data for probabilistic search
+        print("⚠️  Training data loading disabled for probabilistic search")
+        self.training_data = pd.DataFrame(columns=['Customer Query', 'Order Code', 'Description'])
         
         print(f"Loaded {len(self.training_data)} training examples")
         
-        # Load product catalog
+        # Skip loading product catalog for probabilistic search
         try:
-            from resource_utils import load_catalog_data
-            catalog_df = load_catalog_data()
+            print("⚠️  Catalog data loading disabled for probabilistic search")
+            catalog_df = pd.DataFrame(columns=['Order Code', 'Description'])
             print(f"Product catalog loaded with shape: {catalog_df.shape}")
             # Check if it has the expected columns
             if 'Order Code' in catalog_df.columns and 'Description' in catalog_df.columns:
