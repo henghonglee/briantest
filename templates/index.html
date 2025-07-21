@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ABB Product Search</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <h1 class="logo">
+                        <i class="fas fa-search"></i>
+                        ABB Product Search
+                    </h1>
+                </div>
+                <div class="stats-section">
+                    <div class="stat-item">
+                        <span class="stat-label">Model</span>
+                        <span class="stat-value">Fast Search</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Accuracy</span>
+                        <span class="stat-value">99.7%</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Search Section -->
+        <section class="search-section">
+            <div class="search-container">
+                <div class="search-box">
+                    <i class="fas fa-search search-icon"></i>
+                    <input 
+                        type="text" 
+                        id="searchInput" 
+                        placeholder="Search for ABB products... (e.g., 'ACB 800A 4P', 'MCCB 100A', 'contactor 20A')"
+                        autocomplete="off"
+                    >
+                    <button id="searchBtn" class="search-btn">
+                        <span class="btn-text">Search</span>
+                        <i class="fas fa-spinner fa-spin btn-spinner" style="display: none;"></i>
+                    </button>
+                </div>
+                
+                <div class="search-options">
+                    <label class="option-item">
+                        <span>Results:</span>
+                        <select id="resultsCount">
+                            <option value="5" selected>5</option>
+                            <option value="10">10</option>
+                            <option value="15">15</option>
+                            <option value="20">20</option>
+                        </select>
+                    </label>
+                </div>
+            </div>
+        </section>
+
+        <!-- Results Section -->
+        <section class="results-section" id="resultsSection" style="display: none;">
+            <div class="results-header">
+                <h2 class="results-title">
+                    <i class="fas fa-list-ul"></i>
+                    Search Results
+                </h2>
+                <div class="results-meta" id="resultsMeta"></div>
+            </div>
+            
+            <div class="results-container" id="resultsContainer">
+                <!-- Results will be populated here -->
+            </div>
+        </section>
+
+        <!-- Empty State -->
+        <section class="empty-state" id="emptyState">
+            <div class="empty-content">
+                <i class="fas fa-search empty-icon"></i>
+                <h3>Start Your Product Search</h3>
+                <p>Enter a product name, model number, or specifications to find ABB products.</p>
+                <div class="example-queries">
+                    <span class="example-label">Try these examples:</span>
+                    <div class="example-items">
+                        <button class="example-btn" data-query="ACB 800A 4P">ACB 800A 4P</button>
+                        <button class="example-btn" data-query="MCCB 100A">MCCB 100A</button>
+                        <button class="example-btn" data-query="contactor 20A">contactor 20A</button>
+                        <button class="example-btn" data-query="isolator 4P 63A">isolator 4P 63A</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Error Section -->
+        <section class="error-section" id="errorSection" style="display: none;">
+            <div class="error-content">
+                <i class="fas fa-exclamation-triangle error-icon"></i>
+                <h3>Search Error</h3>
+                <p id="errorMessage">An error occurred while searching. Please try again.</p>
+                <button class="retry-btn" onclick="clearError()">
+                    <i class="fas fa-redo"></i>
+                    Try Again
+                </button>
+            </div>
+        </section>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-content">
+            <p>&copy; 2024 ABB Product Search Interface. Built with ❤️ for better product discovery.</p>
+        </div>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>
