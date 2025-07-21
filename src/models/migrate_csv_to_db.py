@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from app import app
 from models import TrainingData, init_db, migrate_csv_to_db
-from resource_utils import get_training_csv_path
+from src.utils import get_training_csv_path
 
 
 def main():

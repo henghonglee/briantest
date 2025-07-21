@@ -59,6 +59,7 @@ body {
 .stats-section {
     display: flex;
     gap: 30px;
+    align-items: center;
 }
 
 .stat-item {
@@ -79,6 +80,232 @@ body {
     color: #323130;
     font-size: 1.25rem;
     font-weight: 600;
+}
+
+.training-btn {
+    background: #0078d4;
+    color: white;
+    border: 1px solid #0078d4;
+    border-radius: 4px;
+    padding: 8px 16px;
+    text-decoration: none;
+    font-size: 0.875rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.training-btn:hover {
+    background: #106ebe;
+    border-color: #106ebe;
+    color: white;
+    text-decoration: none;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.training-btn i {
+    font-size: 0.875rem;
+}
+
+/* Excel Upload Section */
+.excel-section {
+    margin-bottom: 40px;
+    background: #ffffff;
+    border: 1px solid #e1dfdd;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.excel-container {
+    padding: 24px;
+}
+
+.excel-header {
+    text-align: center;
+    margin-bottom: 24px;
+}
+
+.excel-header h2 {
+    color: #323130;
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin: 0 0 8px 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+}
+
+.excel-header h2 i {
+    color: #0078d4;
+}
+
+.excel-header p {
+    color: #605e5c;
+    font-size: 0.875rem;
+    margin: 0;
+}
+
+.excel-upload-area {
+    border: 2px dashed #c8c6c4;
+    border-radius: 8px;
+    padding: 40px 24px;
+    text-align: center;
+    margin-bottom: 20px;
+    transition: all 0.2s ease;
+    background: #fafafa;
+}
+
+.excel-upload-area.dragover {
+    border-color: #0078d4;
+    background: #f3f9fd;
+}
+
+.upload-content h3 {
+    color: #323130;
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin: 12px 0 8px 0;
+}
+
+.upload-content p {
+    color: #605e5c;
+    font-size: 0.875rem;
+    margin: 0 0 16px 0;
+}
+
+.upload-icon {
+    font-size: 3rem;
+    color: #0078d4;
+    margin-bottom: 8px;
+}
+
+.browse-btn {
+    background: none;
+    border: none;
+    color: #0078d4;
+    font-size: 0.875rem;
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 0;
+}
+
+.browse-btn:hover {
+    color: #106ebe;
+}
+
+.file-info {
+    margin-top: 16px;
+}
+
+.file-info small {
+    color: #a19f9d;
+    font-size: 0.75rem;
+    line-height: 1.4;
+}
+
+.selected-file {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    background: #ffffff;
+    border: 1px solid #0078d4;
+    border-radius: 4px;
+    padding: 16px;
+    color: #0078d4;
+    font-weight: 500;
+}
+
+.selected-file i {
+    font-size: 1.25rem;
+}
+
+.remove-file {
+    background: #d13438;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.remove-file:hover {
+    background: #b73034;
+}
+
+.excel-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.process-btn {
+    background: #0078d4;
+    color: white;
+    border: 1px solid #0078d4;
+    border-radius: 4px;
+    padding: 12px 24px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 140px;
+    justify-content: center;
+}
+
+.process-btn:hover:not(:disabled) {
+    background: #106ebe;
+    border-color: #106ebe;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.process-btn:disabled {
+    background: #f3f2f1;
+    border-color: #e1dfdd;
+    color: #a19f9d;
+    cursor: not-allowed;
+}
+
+.excel-status {
+    font-size: 0.875rem;
+    padding: 8px 16px;
+    border-radius: 4px;
+    max-width: 400px;
+    text-align: center;
+}
+
+.excel-status.success {
+    background: #dff6dd;
+    color: #107c10;
+    border: 1px solid #92c5f7;
+}
+
+.excel-status.error {
+    background: #fed9cc;
+    color: #d13438;
+    border: 1px solid #d13438;
+}
+
+.excel-status.processing {
+    background: #deecf9;
+    color: #0078d4;
+    border: 1px solid #0078d4;
 }
 
 /* Search Section */

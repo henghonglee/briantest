@@ -20,7 +20,7 @@ import joblib
 
 class ProbabilisticProductMatcher:
     def __init__(self, model_path: str = None):
-        from resource_utils import get_product_model_path
+        from src.utils import get_product_model_path
         self.model_path = model_path or get_product_model_path()
         self.tfidf_vectorizer = TfidfVectorizer(
             ngram_range=(1, 3),

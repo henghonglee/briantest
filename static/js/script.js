@@ -1,5 +1,6 @@
 // Global variables
 let isSearching = false;
+let selectedExcelFile = null;
 
 // DOM elements
 const searchInput = document.getElementById('searchInput');
@@ -295,7 +296,7 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// Initialize page
+// Excel Upload Functionality
 document.addEventListener('DOMContentLoaded', function() {
     // Show empty state initially
     emptyState.style.display = 'block';
@@ -311,4 +312,162 @@ document.addEventListener('DOMContentLoaded', function() {
         .catch(error => {
             console.warn('Health check failed:', error);
         });
+    
+    // Excel upload functionality
+    setupExcelUpload();
 });
+
+function setupExcelUpload() {
+    const uploadArea = document.getElementById('excelUploadArea');
+    const fileInput = document.getElementById('excelFileInput');
+    const selectedFile = document.getElementById('selectedFile');
+    const fileName = document.getElementById('fileName');
+    const processBtn = document.getElementById('processBtn');
+    
+    // Drag and drop handlers
+    uploadArea.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        uploadArea.classList.add('dragover');
+    });
+    
+    uploadArea.addEventListener('dragleave', function(e) {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+    });
+    
+    uploadArea.addEventListener('drop', function(e) {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            handleFileSelection(files[0]);
+        }
+    });
+    
+    // File input change
+    fileInput.addEventListener('change', function(e) {
+        if (e.target.files.length > 0) {
+            handleFileSelection(e.target.files[0]);
+        }
+    });
+}
+
+function handleFileSelection(file) {
+    if (!file.name.toLowerCase().endsWith('.xlsx') && !file.name.toLowerCase().endsWith('.xls')) {
+        showExcelStatus('Only Excel files (.xlsx, .xls) are supported.', 'error');
+        return;
+    }
+    
+    selectedExcelFile = file;
+    
+    // Update UI
+    document.querySelector('.upload-content').style.display = 'none';
+    document.getElementById('selectedFile').style.display = 'flex';
+    document.getElementById('fileName').textContent = file.name;
+    document.getElementById('processBtn').disabled = false;
+    
+    // Clear any previous status
+    showExcelStatus('');
+}
+
+function clearSelectedFile() {
+    selectedExcelFile = null;
+    document.querySelector('.upload-content').style.display = 'block';
+    document.getElementById('selectedFile').style.display = 'none';
+    document.getElementById('processBtn').disabled = true;
+    document.getElementById('excelFileInput').value = '';
+    showExcelStatus('');
+}
+
+async function processExcel() {
+    if (!selectedExcelFile) {
+        showExcelStatus('Please select an Excel file first.', 'error');
+        return;
+    }
+    
+    const processBtn = document.getElementById('processBtn');
+    const btnText = processBtn.querySelector('.btn-text');
+    const btnSpinner = processBtn.querySelector('.btn-spinner');
+    
+    // Show loading state
+    processBtn.disabled = true;
+    btnText.style.display = 'none';
+    btnSpinner.style.display = 'inline-block';
+    showExcelStatus('Processing your Excel file...', 'processing');
+    
+    try {
+        const formData = new FormData();
+        formData.append('file', selectedExcelFile);
+        
+        const response = await fetch('/api/process_excel', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showExcelStatus(
+                `✅ ${data.message}. Processed ${data.sheets_processed.join(', ')}.`, 
+                'success'
+            );
+            
+            // Trigger download
+            downloadExcelFile(data.file_data, selectedExcelFile.name);
+        } else {
+            showExcelStatus(`❌ ${data.error}`, 'error');
+        }
+        
+    } catch (error) {
+        console.error('Excel processing error:', error);
+        showExcelStatus('❌ Failed to process Excel file. Please try again.', 'error');
+    } finally {
+        // Reset button state
+        processBtn.disabled = false;
+        btnText.style.display = 'inline';
+        btnSpinner.style.display = 'none';
+    }
+}
+
+function downloadExcelFile(hexData, originalFileName) {
+    try {
+        // Convert hex string back to bytes
+        const bytes = new Uint8Array(hexData.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+        const blob = new Blob([bytes], { 
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+        });
+        
+        // Create download link
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        
+        // Generate filename
+        const name = originalFileName.replace(/\.[^/.]+$/, '');
+        a.download = `${name}_processed.xlsx`;
+        
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        
+    } catch (error) {
+        console.error('Download error:', error);
+        showExcelStatus('❌ Failed to download processed file.', 'error');
+    }
+}
+
+function showExcelStatus(message, type = '') {
+    const status = document.getElementById('excelStatus');
+    status.textContent = message;
+    status.className = `excel-status ${type}`;
+    
+    if (message && type !== 'processing') {
+        setTimeout(() => {
+            if (status.textContent === message) {
+                status.textContent = '';
+                status.className = 'excel-status';
+            }
+        }, 5000);
+    }
+}

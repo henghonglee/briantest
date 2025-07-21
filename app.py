@@ -7,9 +7,8 @@ from flask import Flask, render_template, request, jsonify
 from werkzeug.utils import secure_filename
 import pandas as pd
 import io
-from fast_search import FastProductMatcher
-from probabilistic_search import ProbabilisticProductMatcher
-from config_manager import config_manager
+from src.search import FastProductMatcher, ProbabilisticProductMatcher
+from src.utils import config_manager
 import time
 import traceback
 import logging
@@ -40,7 +39,7 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
 }
 
 # Initialize database and search matchers
-from models import db, init_db, TrainingData, migrate_csv_to_db
+from src.models import db, init_db, TrainingData, migrate_csv_to_db
 db.init_app(app)
 
 search_matcher = None
@@ -280,7 +279,7 @@ def get_training_data():
         except Exception as db_error:
             print(f"Database query failed: {db_error}")
             # Fallback to file-based loading
-            from resource_utils import load_training_data
+            from src.utils import load_training_data
             
             df = load_training_data()
             training_data = []
@@ -375,7 +374,7 @@ def upload_training_data():
         except Exception as db_error:
             print(f"Database insert failed: {db_error}")
             # Fallback to file-based storage
-            from resource_utils import load_training_data, get_training_csv_path
+            from src.utils import load_training_data, get_training_csv_path
             existing_df = load_training_data()
             
             # Append new data
@@ -459,7 +458,7 @@ def delete_training_row():
         except Exception as db_error:
             print(f"Database delete failed: {db_error}")
             # Fallback to file-based deletion
-            from resource_utils import load_training_data, get_training_csv_path
+            from src.utils import load_training_data, get_training_csv_path
             df = load_training_data()
             
             row_index = int(record_id)
@@ -507,6 +506,152 @@ def training_management():
     """Training data management page."""
     return render_template('training_management.html')
 
+@app.route('/api/process_excel', methods=['POST'])
+def process_excel():
+    """Process Excel file and add search results to Customer Query columns."""
+    try:
+        if 'file' not in request.files:
+            return jsonify({
+                'success': False,
+                'error': 'No file provided'
+            }), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({
+                'success': False,
+                'error': 'No file selected'
+            }), 400
+        
+        if not file.filename.lower().endswith(('.xlsx', '.xls')):
+            return jsonify({
+                'success': False,
+                'error': 'Only Excel files (.xlsx, .xls) are allowed'
+            }), 400
+        
+        if not search_matcher:
+            return jsonify({
+                'success': False,
+                'error': 'Search service not available'
+            }), 503
+        
+        # Read Excel file
+        try:
+            excel_file = pd.ExcelFile(io.BytesIO(file.read()))
+            processed_sheets = {}
+            total_queries_processed = 0
+            
+            for sheet_name in excel_file.sheet_names:
+                df = pd.read_excel(excel_file, sheet_name=sheet_name)
+                
+                # Look for columns named "Customer Query" (case insensitive)
+                customer_query_cols = []
+                for col in df.columns:
+                    if str(col).lower().strip() == 'customer query':
+                        customer_query_cols.append(col)
+                
+                if not customer_query_cols:
+                    continue  # Skip sheets without Customer Query column
+                
+                # Process each Customer Query column
+                processed_df = df.copy()
+                
+                for query_col in customer_query_cols:
+                    # Add new columns to the right of the Customer Query column
+                    col_index = df.columns.get_loc(query_col)
+                    
+                    # Create new column names
+                    order_code_col = f"{query_col}_Order_Code"
+                    description_col = f"{query_col}_Description" 
+                    match_info_col = f"{query_col}_Match_Info"
+                    
+                    # Initialize new columns
+                    processed_df[order_code_col] = ''
+                    processed_df[description_col] = ''
+                    processed_df[match_info_col] = ''
+                    
+                    # Process each query in the column
+                    for idx, query in enumerate(df[query_col]):
+                        if pd.notna(query) and str(query).strip():
+                            query_str = str(query).strip()
+                            
+                            # Perform search
+                            try:
+                                results = search_matcher.search_fast(query_str, top_k=1)
+                                if results:
+                                    best_result = results[0]
+                                    processed_df.loc[idx, order_code_col] = best_result['order_code']
+                                    processed_df.loc[idx, description_col] = best_result['description']
+                                    
+                                    # Determine match type and score
+                                    match_type = best_result.get('match_type', 'fuzzy')
+                                    score = best_result.get('probability', 0)
+                                    
+                                    if match_type == 'exact':
+                                        match_info = f"Exact Match (Score: {score:.3f})"
+                                    else:
+                                        match_info = f"Fuzzy Match (Score: {score:.3f})"
+                                    
+                                    processed_df.loc[idx, match_info_col] = match_info
+                                    total_queries_processed += 1
+                                else:
+                                    processed_df.loc[idx, match_info_col] = "No Match Found"
+                                    
+                            except Exception as search_error:
+                                print(f"Search error for query '{query_str}': {search_error}")
+                                processed_df.loc[idx, match_info_col] = f"Search Error: {str(search_error)}"
+                
+                # Reorder columns to put new columns right after Customer Query columns
+                new_column_order = []
+                for col in df.columns:
+                    new_column_order.append(col)
+                    if str(col).lower().strip() == 'customer query':
+                        # Add the new columns right after this Customer Query column
+                        order_code_col = f"{col}_Order_Code"
+                        description_col = f"{col}_Description"
+                        match_info_col = f"{col}_Match_Info"
+                        if order_code_col in processed_df.columns:
+                            new_column_order.extend([order_code_col, description_col, match_info_col])
+                
+                processed_df = processed_df[new_column_order]
+                processed_sheets[sheet_name] = processed_df
+            
+            if not processed_sheets:
+                return jsonify({
+                    'success': False,
+                    'error': 'No sheets found with "Customer Query" columns'
+                }), 400
+            
+            # Create output Excel file
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                for sheet_name, df in processed_sheets.items():
+                    df.to_excel(writer, sheet_name=sheet_name, index=False)
+            
+            output.seek(0)
+            
+            return jsonify({
+                'success': True,
+                'message': f'Successfully processed {len(processed_sheets)} sheet(s) with {total_queries_processed} queries',
+                'sheets_processed': list(processed_sheets.keys()),
+                'total_queries': total_queries_processed,
+                'file_data': output.getvalue().hex()  # Convert to hex for JSON transport
+            })
+            
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'error': f'Failed to process Excel file: {str(e)}'
+            }), 400
+        
+    except Exception as e:
+        print(f"Excel processing error: {e}")
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': f'Failed to process Excel file: {str(e)}'
+        }), 500
+
 # Initialize database and matchers on startup for production
 setup_logging()
 print("🚀 ABB Product Search Starting...")
@@ -523,7 +668,7 @@ try:
         if TrainingData.get_total_count() == 0:
             print("🔄 Database is empty, attempting CSV migration...")
             try:
-                from resource_utils import get_training_csv_path
+                from src.utils import get_training_csv_path
                 training_path = get_training_csv_path()
                 if training_path != "REMOTE_TRAINING_DATA" and os.path.exists(training_path):
                     migrate_csv_to_db(training_path, app)

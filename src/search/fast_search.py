@@ -16,7 +16,7 @@ import time
 
 class FastProductMatcher:
     def __init__(self, model_path: str = None):
-        from resource_utils import get_fast_model_path
+        from src.utils import get_fast_model_path
         self.model_path = model_path or get_fast_model_path()
         self.tfidf_vectorizer = TfidfVectorizer(
             ngram_range=(1, 2),
@@ -41,7 +41,7 @@ class FastProductMatcher:
     def load_data_and_prepare(self):
         """Load training data and prepare embeddings."""
         print("Loading training data...")
-        from resource_utils import load_training_data
+        from src.utils import load_training_data
         try:
             self.training_data = load_training_data()
         except FileNotFoundError:
@@ -217,7 +217,7 @@ class FastProductMatcher:
             self.training_data = pd.concat([self.training_data, new_row], ignore_index=True)
             
             # Save to CSV file
-            from resource_utils import get_training_csv_path
+            from src.utils import get_training_csv_path
             self.training_data.to_csv(get_training_csv_path(), index=False)
             
             # Regenerate embeddings with new data

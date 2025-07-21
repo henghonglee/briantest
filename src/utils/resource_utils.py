@@ -5,8 +5,8 @@ Utility functions for handling resources in both development and installed envir
 
 import os
 import sys
-from config_manager import config_manager
-from remote_data_loader import remote_loader
+from .config_manager import config_manager
+from .remote_data_loader import remote_loader
 
 
 def get_resource_path(relative_path):
