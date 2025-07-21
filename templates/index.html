@@ -35,72 +35,88 @@
             </div>
         </header>
 
-        <!-- Search Section -->
-        <section class="search-section">
-            <div class="search-container">
-                <div class="search-box">
-                    <i class="fas fa-search search-icon"></i>
-                    <input 
-                        type="text" 
-                        id="searchInput" 
-                        placeholder="Search for ABB products... (e.g., 'ACB 800A 4P', 'MCCB 100A', 'contactor 20A')"
-                        autocomplete="off"
-                    >
-                    <button id="searchBtn" class="search-btn">
-                        <span class="btn-text">Search</span>
-                        <i class="fas fa-spinner fa-spin btn-spinner" style="display: none;"></i>
+        <!-- Tab Navigation -->
+        <section class="tab-section">
+            <div class="tab-container">
+                <div class="tab-nav">
+                    <button class="tab-btn active" data-tab="search">
+                        <i class="fas fa-search"></i>
+                        Single Search
+                    </button>
+                    <button class="tab-btn" data-tab="bulk">
+                        <i class="fas fa-file-excel"></i>
+                        Bulk Processing
                     </button>
                 </div>
                 
-                <div class="search-options">
-                    <label class="option-item">
-                        <span>Results:</span>
-                        <select id="resultsCount">
-                            <option value="5" selected>5</option>
-                            <option value="10">10</option>
-                            <option value="15">15</option>
-                            <option value="20">20</option>
-                        </select>
-                    </label>
-                </div>
-            </div>
-        </section>
-
-        <!-- Excel Upload Section -->
-        <section class="excel-section">
-            <div class="excel-container">
-                <div class="excel-header">
-                    <h2>
-                        <i class="fas fa-file-excel"></i>
-                        Bulk Excel Processing
-                    </h2>
-                    <p>Upload an Excel file with "Customer Query" columns to get automatic product matches</p>
-                </div>
-                
-                <div class="excel-upload-area" id="excelUploadArea">
-                    <div class="upload-content">
-                        <i class="fas fa-cloud-upload-alt upload-icon"></i>
-                        <h3>Drop your Excel file here</h3>
-                        <p>or <button class="browse-btn" onclick="document.getElementById('excelFileInput').click()">browse files</button></p>
-                        <div class="file-info">
-                            <small>Supports .xlsx and .xls files. Looks for "Customer Query" columns and adds Order Code, Description, and Match Info columns to the right.</small>
+                <!-- Single Search Tab Content -->
+                <div class="tab-content active" id="searchTab">
+                    <div class="search-container">
+                        <div class="search-box">
+                            <i class="fas fa-search search-icon"></i>
+                            <input 
+                                type="text" 
+                                id="searchInput" 
+                                placeholder="Search for ABB products... (e.g., 'ACB 800A 4P', 'MCCB 100A', 'contactor 20A')"
+                                autocomplete="off"
+                            >
+                            <button id="searchBtn" class="search-btn">
+                                <span class="btn-text">Search</span>
+                                <i class="fas fa-spinner fa-spin btn-spinner" style="display: none;"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="search-options">
+                            <label class="option-item">
+                                <span>Results:</span>
+                                <select id="resultsCount">
+                                    <option value="5" selected>5</option>
+                                    <option value="10">10</option>
+                                    <option value="15">15</option>
+                                    <option value="20">20</option>
+                                </select>
+                            </label>
                         </div>
                     </div>
-                    <input type="file" id="excelFileInput" accept=".xlsx,.xls" style="display: none;">
-                    <div class="selected-file" id="selectedFile" style="display: none;">
-                        <i class="fas fa-file-excel"></i>
-                        <span class="file-name" id="fileName"></span>
-                        <button class="remove-file" onclick="clearSelectedFile()">×</button>
-                    </div>
                 </div>
                 
-                <div class="excel-actions">
-                    <button class="process-btn" id="processBtn" onclick="processExcel()" disabled>
-                        <i class="fas fa-cogs"></i>
-                        <span class="btn-text">Process Excel</span>
-                        <i class="fas fa-spinner fa-spin btn-spinner" style="display: none;"></i>
-                    </button>
-                    <div class="excel-status" id="excelStatus"></div>
+                <!-- Bulk Processing Tab Content -->
+                <div class="tab-content" id="bulkTab">
+                    <div class="excel-container">
+                        <div class="excel-header">
+                            <h2>
+                                <i class="fas fa-file-excel"></i>
+                                Bulk Excel Processing
+                            </h2>
+                            <p>Upload an Excel file with "Customer Query" columns to get automatic product matches</p>
+                        </div>
+                        
+                        <div class="excel-upload-area" id="excelUploadArea">
+                            <div class="upload-content">
+                                <i class="fas fa-cloud-upload-alt upload-icon"></i>
+                                <h3>Drop your Excel file here</h3>
+                                <p>or <button class="browse-btn" onclick="document.getElementById('excelFileInput').click()">browse files</button></p>
+                                <div class="file-info">
+                                    <small>Supports .xlsx and .xls files. Looks for "Customer Query" columns and adds Order Code, Description, and Match Info columns to the right.</small>
+                                </div>
+                            </div>
+                            <input type="file" id="excelFileInput" accept=".xlsx,.xls" style="display: none;">
+                            <div class="selected-file" id="selectedFile" style="display: none;">
+                                <i class="fas fa-file-excel"></i>
+                                <span class="file-name" id="fileName"></span>
+                                <button class="remove-file" onclick="clearSelectedFile()">×</button>
+                            </div>
+                        </div>
+                        
+                        <div class="excel-actions">
+                            <button class="process-btn" id="processBtn" onclick="processExcel()" disabled>
+                                <i class="fas fa-cogs"></i>
+                                <span class="btn-text">Process Excel</span>
+                                <i class="fas fa-spinner fa-spin btn-spinner" style="display: none;"></i>
+                            </button>
+                            <div class="excel-status" id="excelStatus"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </section>

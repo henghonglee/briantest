@@ -15,6 +15,9 @@ const resultsCount = document.getElementById('resultsCount');
 
 // Event listeners
 document.addEventListener('DOMContentLoaded', function() {
+    // Tab switching functionality
+    setupTabSwitching();
+    
     // Search button click
     searchBtn.addEventListener('click', performSearch);
     
@@ -287,6 +290,39 @@ async function addToTraining(orderCode, description) {
             alert('Network error. Could not add training example.');
         }
     }
+}
+
+// Setup tab switching functionality
+function setupTabSwitching() {
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+    
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const targetTab = this.getAttribute('data-tab');
+            
+            // Remove active class from all tabs and contents
+            tabBtns.forEach(b => b.classList.remove('active'));
+            tabContents.forEach(content => content.classList.remove('active'));
+            
+            // Add active class to clicked tab
+            this.classList.add('active');
+            
+            // Show corresponding content
+            const targetContent = targetTab === 'search' ? 
+                document.getElementById('searchTab') : 
+                document.getElementById('bulkTab');
+            
+            if (targetContent) {
+                targetContent.classList.add('active');
+            }
+            
+            // Focus search input when switching to search tab
+            if (targetTab === 'search') {
+                setTimeout(() => searchInput.focus(), 100);
+            }
+        });
+    });
 }
 
 // Utility function to escape HTML
