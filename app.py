@@ -544,11 +544,23 @@ def process_excel():
             for sheet_name in excel_file.sheet_names:
                 df = pd.read_excel(excel_file, sheet_name=sheet_name)
                 
-                # Look for columns named "Customer Query" (case insensitive)
+                # Look for columns that could contain customer queries (more flexible matching)
                 customer_query_cols = []
+                possible_patterns = [
+                    'customer query', 'customer_query', 'query', 'search',
+                    'description', 'product description', 'item description',
+                    'requirement', 'product requirement', 'product'
+                ]
+                
                 for col in df.columns:
-                    if str(col).lower().strip() == 'customer query':
+                    col_lower = str(col).lower().strip()
+                    # Exact match for preferred patterns
+                    if col_lower in ['customer query', 'customer_query']:
                         customer_query_cols.append(col)
+                    # If no exact match found, look for other potential query columns
+                    elif not customer_query_cols and any(pattern in col_lower for pattern in ['query', 'description', 'requirement']):
+                        # Only suggest these as alternatives, don't auto-process
+                        pass
                 
                 if not customer_query_cols:
                     continue  # Skip sheets without Customer Query column
@@ -617,9 +629,27 @@ def process_excel():
                 processed_sheets[sheet_name] = processed_df
             
             if not processed_sheets:
+                # Provide helpful error message with suggestions
+                all_columns = set()
+                for sheet_name in excel_file.sheet_names:
+                    df = pd.read_excel(excel_file, sheet_name=sheet_name)
+                    all_columns.update([str(col) for col in df.columns if str(col) != 'nan'])
+                
+                # Find potential columns that might be what the user intended
+                potential_cols = []
+                for col in all_columns:
+                    col_lower = str(col).lower().strip()
+                    if any(pattern in col_lower for pattern in ['query', 'description', 'requirement', 'product', 'item']):
+                        potential_cols.append(col)
+                
+                error_msg = 'No sheets found with "Customer Query" columns. '
+                if potential_cols:
+                    error_msg += f'Found potential columns: {", ".join(potential_cols[:5])}. '
+                error_msg += 'Please ensure your Excel file has a column named "Customer Query" containing the product search terms.'
+                
                 return jsonify({
                     'success': False,
-                    'error': 'No sheets found with "Customer Query" columns'
+                    'error': error_msg
                 }), 400
             
             # Create output Excel file
