@@ -4,6 +4,9 @@ Flask web application for ABB Product Search Interface.
 """
 
 from flask import Flask, render_template, request, jsonify
+from werkzeug.utils import secure_filename
+import pandas as pd
+import io
 from fast_search import FastProductMatcher
 from probabilistic_search import ProbabilisticProductMatcher
 from config_manager import config_manager
@@ -13,6 +16,7 @@ import logging
 import os
 
 app = Flask(__name__)
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
 # Initialize search matchers
 search_matcher = None
@@ -224,6 +228,182 @@ def probability_score():
             'success': False,
             'error': f'Probability scoring failed: {str(e)}'
         }), 500
+
+@app.route('/api/training_data')
+def get_training_data():
+    """Get current training data for browsing."""
+    try:
+        from resource_utils import load_training_data
+        
+        # Load training data
+        df = load_training_data()
+        
+        # Convert to list of dictionaries with row indices
+        training_data = []
+        for idx, row in df.iterrows():
+            training_data.append({
+                'index': int(idx),
+                'customer_query': row.get('Customer Query', ''),
+                'order_code': row.get('Order Code', ''),
+                'description': row.get('Description', '')
+            })
+        
+        return jsonify({
+            'success': True,
+            'data': training_data,
+            'total_rows': len(training_data)
+        })
+        
+    except Exception as e:
+        print(f"Error loading training data: {e}")
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': f'Failed to load training data: {str(e)}'
+        }), 500
+
+@app.route('/api/training_data/upload', methods=['POST'])
+def upload_training_data():
+    """Upload and append new training data from CSV file."""
+    try:
+        if 'file' not in request.files:
+            return jsonify({
+                'success': False,
+                'error': 'No file provided'
+            }), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({
+                'success': False,
+                'error': 'No file selected'
+            }), 400
+        
+        if not file.filename.lower().endswith('.csv'):
+            return jsonify({
+                'success': False,
+                'error': 'Only CSV files are allowed'
+            }), 400
+        
+        # Read the uploaded CSV
+        try:
+            csv_content = file.read().decode('utf-8')
+            new_df = pd.read_csv(io.StringIO(csv_content))
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'error': f'Failed to parse CSV file: {str(e)}'
+            }), 400
+        
+        # Validate required columns
+        required_columns = ['Customer Query', 'Order Code', 'Description']
+        missing_columns = [col for col in required_columns if col not in new_df.columns]
+        if missing_columns:
+            return jsonify({
+                'success': False,
+                'error': f'Missing required columns: {", ".join(missing_columns)}'
+            }), 400
+        
+        # Load existing training data
+        from resource_utils import load_training_data, get_training_csv_path
+        existing_df = load_training_data()
+        
+        # Append new data
+        combined_df = pd.concat([existing_df, new_df[required_columns]], ignore_index=True)
+        
+        # Remove duplicates based on Customer Query and Order Code
+        combined_df = combined_df.drop_duplicates(subset=['Customer Query', 'Order Code'], keep='first')
+        
+        # Save back to local file (if it exists locally)
+        try:
+            training_path = get_training_csv_path()
+            if training_path != "REMOTE_TRAINING_DATA":
+                combined_df.to_csv(training_path, index=False)
+                print(f"✅ Updated local training file with {len(new_df)} new rows")
+        except Exception as e:
+            print(f"⚠️ Could not save to local file: {e}")
+        
+        # Update the fast search matcher if available
+        if search_matcher:
+            search_matcher.training_data = combined_df
+            search_matcher.load_data_and_prepare()
+            print("✅ Updated search matcher with new training data")
+        
+        return jsonify({
+            'success': True,
+            'message': f'Successfully uploaded {len(new_df)} rows',
+            'new_rows': len(new_df),
+            'total_rows': len(combined_df),
+            'duplicates_removed': len(existing_df) + len(new_df) - len(combined_df)
+        })
+        
+    except Exception as e:
+        print(f"Upload training data error: {e}")
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': f'Failed to upload training data: {str(e)}'
+        }), 500
+
+@app.route('/api/training_data/delete', methods=['POST'])
+def delete_training_row():
+    """Delete a specific row from training data."""
+    try:
+        data = request.get_json()
+        row_index = data.get('index')
+        
+        if row_index is None:
+            return jsonify({
+                'success': False,
+                'error': 'Row index is required'
+            }), 400
+        
+        # Load current training data
+        from resource_utils import load_training_data, get_training_csv_path
+        df = load_training_data()
+        
+        if row_index < 0 or row_index >= len(df):
+            return jsonify({
+                'success': False,
+                'error': 'Invalid row index'
+            }), 400
+        
+        # Remove the specified row
+        df = df.drop(df.index[row_index]).reset_index(drop=True)
+        
+        # Save back to local file (if it exists locally)
+        try:
+            training_path = get_training_csv_path()
+            if training_path != "REMOTE_TRAINING_DATA":
+                df.to_csv(training_path, index=False)
+                print(f"✅ Deleted row {row_index} from local training file")
+        except Exception as e:
+            print(f"⚠️ Could not save to local file: {e}")
+        
+        # Update the fast search matcher if available
+        if search_matcher:
+            search_matcher.training_data = df
+            search_matcher.load_data_and_prepare()
+            print("✅ Updated search matcher after row deletion")
+        
+        return jsonify({
+            'success': True,
+            'message': f'Successfully deleted row {row_index}',
+            'remaining_rows': len(df)
+        })
+        
+    except Exception as e:
+        print(f"Delete training row error: {e}")
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': f'Failed to delete training row: {str(e)}'
+        }), 500
+
+@app.route('/training')
+def training_management():
+    """Training data management page."""
+    return render_template('training_management.html')
 
 # Initialize matchers on startup for production
 setup_logging()
