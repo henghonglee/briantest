@@ -166,6 +166,23 @@ class TrainingData(db.Model):
         except Exception as e:
             db.session.rollback()
             raise e
+    
+    @classmethod
+    def create(cls, customer_query, order_code, description):
+        """Create a new training data record."""
+        try:
+            record = cls(
+                customer_query=customer_query.strip(),
+                order_code=order_code.strip(), 
+                description=description.strip()
+            )
+            db.session.add(record)
+            db.session.commit()
+            return True
+        except Exception as e:
+            db.session.rollback()
+            print(f"Error creating training record: {e}")
+            return False
 
 
 def init_db(app):
