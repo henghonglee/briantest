@@ -41,9 +41,9 @@ class FastProductMatcher:
     def load_data_and_prepare(self):
         """Load training data and prepare embeddings."""
         print("Loading training data...")
-        from resource_utils import get_training_csv_path
+        from resource_utils import load_training_data
         try:
-            self.training_data = pd.read_csv(get_training_csv_path())
+            self.training_data = load_training_data()
         except FileNotFoundError:
             print("⚠️  Training data not found, creating empty dataset...")
             # Create empty training data structure

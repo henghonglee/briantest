@@ -6,6 +6,7 @@ Utility functions for handling resources in both development and installed envir
 import os
 import sys
 from config_manager import config_manager
+from remote_data_loader import remote_loader
 
 
 def get_resource_path(relative_path):
@@ -20,23 +21,67 @@ def get_resource_path(relative_path):
 
 
 def get_training_csv_path():
-    """Get path to training CSV file."""
+    """Get path to training CSV file or load from remote."""
     # First try config manager (installed version)
     try:
-        return config_manager.get_training_file_path("training.csv")
+        local_path = config_manager.get_training_file_path("training.csv")
+        if os.path.exists(local_path):
+            return local_path
     except:
-        # Fallback to bundled resource (PyInstaller)
-        return get_resource_path(os.path.join("training", "training.csv"))
+        pass
+    
+    # Try bundled resource (PyInstaller)
+    try:
+        bundled_path = get_resource_path(os.path.join("training", "training.csv"))
+        if os.path.exists(bundled_path):
+            return bundled_path
+    except:
+        pass
+    
+    # Fallback to remote loading - return special marker
+    return "REMOTE_TRAINING_DATA"
 
 
 def get_abb_csv_path():
-    """Get path to ABB CSV file."""
+    """Get path to ABB CSV file or load from remote."""
     # First try config manager (installed version)
     try:
-        return config_manager.get_data_file_path("ABB.csv")
+        local_path = config_manager.get_data_file_path("ABB.csv")
+        if os.path.exists(local_path):
+            return local_path
     except:
-        # Fallback to bundled resource (PyInstaller)
-        return get_resource_path("ABB.csv")
+        pass
+    
+    # Try bundled resource (PyInstaller)
+    try:
+        bundled_path = get_resource_path("ABB.csv")
+        if os.path.exists(bundled_path):
+            return bundled_path
+    except:
+        pass
+    
+    # Fallback to remote loading - return special marker
+    return "REMOTE_ABB_DATA"
+
+
+def load_training_data():
+    """Load training data from local file or remote source."""
+    path = get_training_csv_path()
+    if path == "REMOTE_TRAINING_DATA":
+        return remote_loader.load_training_data()
+    else:
+        import pandas as pd
+        return pd.read_csv(path)
+
+
+def load_catalog_data():
+    """Load catalog data from local file or remote source."""
+    path = get_abb_csv_path()
+    if path == "REMOTE_ABB_DATA":
+        return remote_loader.load_catalog_data()
+    else:
+        import pandas as pd
+        return pd.read_csv(path)
 
 
 def get_fast_model_path():

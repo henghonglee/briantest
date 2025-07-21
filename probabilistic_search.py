@@ -56,8 +56,8 @@ class ProbabilisticProductMatcher:
         
         # Load training data using resource utils
         try:
-            from resource_utils import get_training_csv_path
-            self.training_data = pd.read_csv(get_training_csv_path())
+            from resource_utils import load_training_data
+            self.training_data = load_training_data()
         except FileNotFoundError:
             print("⚠️  Training data not found, creating empty dataset...")
             # Create empty training data structure
@@ -70,8 +70,8 @@ class ProbabilisticProductMatcher:
         
         # Load product catalog
         try:
-            from resource_utils import get_abb_csv_path
-            catalog_df = pd.read_csv(get_abb_csv_path())
+            from resource_utils import load_catalog_data
+            catalog_df = load_catalog_data()
             print(f"Product catalog loaded with shape: {catalog_df.shape}")
             # Check if it has the expected columns
             if 'Order Code' in catalog_df.columns and 'Description' in catalog_df.columns:
