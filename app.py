@@ -59,6 +59,7 @@ def initialize_matcher():
     except Exception as e:
         print(f"❌ Failed to initialize matchers: {e}")
         logging.error(f"Failed to initialize matchers: {e}")
+        traceback.print_exc()
         return False
 
 @app.route('/')
@@ -233,8 +234,8 @@ print(f"Models directory: {config_manager.get('models_dir')}")
 
 # Initialize the search matcher
 if not initialize_matcher():
-    print("❌ Failed to initialize matchers")
-    exit(1)
+    print("⚠️  Failed to initialize matchers, but continuing...")
+    print("📌 App will run in limited mode - add training data via API")
 
 if __name__ == '__main__':
     host = config_manager.get('host', '0.0.0.0')

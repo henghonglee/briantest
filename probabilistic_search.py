@@ -54,20 +54,17 @@ class ProbabilisticProductMatcher:
         """Load training data and product catalog."""
         print("Loading training data...")
         
-        # Load training data
-        training_files = []
-        training_dir = "/Users/henghonglee/abb2/training"
-        
-        for file in os.listdir(training_dir):
-            if file.endswith('.csv'):
-                file_path = os.path.join(training_dir, file)
-                df = pd.read_csv(file_path)
-                training_files.append(df)
-        
-        if training_files:
-            self.training_data = pd.concat(training_files, ignore_index=True)
-        else:
-            raise ValueError("No training CSV files found in training directory")
+        # Load training data using resource utils
+        try:
+            from resource_utils import get_training_csv_path
+            self.training_data = pd.read_csv(get_training_csv_path())
+        except FileNotFoundError:
+            print("⚠️  Training data not found, creating empty dataset...")
+            # Create empty training data structure
+            self.training_data = pd.DataFrame(columns=['Customer Query', 'Order Code', 'Description'])
+        except Exception as e:
+            print(f"⚠️  Could not load training data: {e}")
+            self.training_data = pd.DataFrame(columns=['Customer Query', 'Order Code', 'Description'])
         
         print(f"Loaded {len(self.training_data)} training examples")
         

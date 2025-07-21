@@ -42,7 +42,12 @@ class FastProductMatcher:
         """Load training data and prepare embeddings."""
         print("Loading training data...")
         from resource_utils import get_training_csv_path
-        self.training_data = pd.read_csv(get_training_csv_path())
+        try:
+            self.training_data = pd.read_csv(get_training_csv_path())
+        except FileNotFoundError:
+            print("⚠️  Training data not found, creating empty dataset...")
+            # Create empty training data structure
+            self.training_data = pd.DataFrame(columns=['Customer Query', 'Order Code', 'Description'])
         # Filter out rows with invalid queries
         self.training_data = self.training_data.dropna(subset=['Customer Query', 'Order Code', 'Description'])
         self.training_data = self.training_data[self.training_data['Customer Query'].str.strip() != '']
@@ -55,9 +60,16 @@ class FastProductMatcher:
             query = self.preprocess_text(row['Customer Query'])
             training_queries.append(query)
         
-        # Fit TF-IDF and create embeddings from training queries
-        self.query_embeddings = self.tfidf_vectorizer.fit_transform(training_queries)
-        print(f"Created embeddings with shape: {self.query_embeddings.shape}")
+        if training_queries:
+            # Fit TF-IDF and create embeddings from training queries
+            self.query_embeddings = self.tfidf_vectorizer.fit_transform(training_queries)
+            print(f"Created embeddings with shape: {self.query_embeddings.shape}")
+        else:
+            # No training data available, fit on dummy data
+            print("⚠️  No training queries available, using minimal setup...")
+            dummy_queries = ["default query"]
+            self.query_embeddings = self.tfidf_vectorizer.fit_transform(dummy_queries)
+            print("Created minimal embeddings setup")
         
         self.is_ready = True
         self.save_model()
@@ -106,6 +118,10 @@ class FastProductMatcher:
         
         fuzzy_results = []
         for idx in top_indices:
+            # Check if index is within bounds
+            if idx >= len(self.training_data):
+                continue  # Skip out-of-bounds indices
+                
             if idx in exact_match_indices:
                 continue  # Skip exact matches already found
                 
