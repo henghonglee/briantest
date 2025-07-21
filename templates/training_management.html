@@ -62,6 +62,9 @@
         .btn-secondary { background: #6c757d; color: white; }
         .btn:hover { opacity: 0.9; }
         .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .btn-danger[onclick="clearAllTrainingData()"] { color: white; }
+        td .btn-danger { background: white; color: black; border: 1px solid #ddd; }
+        td .btn-danger:hover { background: #f0f0f0; }
         table {
             width: 100%;
             border-collapse: collapse;
@@ -189,6 +192,7 @@
             <div style="margin-bottom: 15px;">
                 <button class="btn btn-primary" onclick="loadTrainingData()">🔄 Refresh Data</button>
                 <button class="btn btn-secondary" onclick="exportTrainingData()">📥 Export Training Data</button>
+                <button class="btn btn-danger" onclick="clearAllTrainingData()">🗂️ Clear All Data</button>
             </div>
             
             <div class="loading" id="dataLoading">
@@ -376,7 +380,7 @@
                     <td>${escapeHtml(row.order_code)}</td>
                     <td>${escapeHtml(row.description)}</td>
                     <td>
-                        <button class="btn btn-danger" onclick="deleteRow(${row.index})" title="Delete this row">🗑️</button>
+                        <button class="btn btn-danger" onclick="deleteRow(${row.index})" title="Delete this row">❌</button>
                     </td>
                 `;
                 tbody.appendChild(tr);
@@ -438,6 +442,50 @@
             window.URL.revokeObjectURL(url);
             
             showAlert('✅ Training data exported successfully!', 'success');
+        }
+
+        function clearAllTrainingData() {
+            // Double confirmation for this destructive action
+            const firstConfirm = confirm('⚠️ WARNING: This will permanently delete ALL training data and reset the search models. Are you absolutely sure?');
+            if (!firstConfirm) {
+                return;
+            }
+            
+            const secondConfirm = confirm('🚨 FINAL CONFIRMATION: This action cannot be undone. All training data will be lost forever. Type confirmation is required.\n\nProceed with clearing all data?');
+            if (!secondConfirm) {
+                return;
+            }
+            
+            // Show loading state
+            const button = event.target;
+            const originalText = button.innerHTML;
+            button.disabled = true;
+            button.innerHTML = '🔄 Clearing...';
+            
+            fetch('/api/training_data/clear_all', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                button.disabled = false;
+                button.innerHTML = originalText;
+                
+                if (data.success) {
+                    showAlert(`✅ ${data.message}`, 'success');
+                    // Reload training data to refresh the table
+                    loadTrainingData();
+                } else {
+                    showAlert(`❌ Clear failed: ${data.error}`, 'error');
+                }
+            })
+            .catch(error => {
+                button.disabled = false;
+                button.innerHTML = originalText;
+                showAlert(`❌ Clear failed: ${error.message}`, 'error');
+            });
         }
 
         function updateStats(totalRows) {

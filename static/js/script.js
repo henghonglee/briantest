@@ -188,6 +188,7 @@ function createResultElement(result, rank, type = 'training') {
         <div class="result-header">
             <div>
                 <div class="result-code">${rank}. [${escapeHtml(result.order_code)}] - ${escapeHtml(result.description)}</div>
+                <div class="result-subtitle">${scoreDisplay}</div>
             </div>
             <div class="result-actions">
                 <div class="result-score">

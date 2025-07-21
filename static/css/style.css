@@ -622,6 +622,13 @@ body {
     margin-bottom: 4px;
 }
 
+.result-subtitle {
+    font-size: 0.875rem;
+    color: #605e5c;
+    font-style: italic;
+    margin-bottom: 8px;
+}
+
 .result-score {
     display: flex;
     align-items: center;

@@ -239,10 +239,14 @@ def perform_catalog_fuzzy_search(query, catalog_df, top_k):
             text_lower = matched_text.lower()
             matched_words = []
             for word in query_words:
-                if len(word) > 2:  # Skip very short words
+                if len(word) == 1:
+                    # For single character words, match exactly (full word only)
+                    pattern = r'\b' + re.escape(word) + r'\b'
+                else:
+                    # For multi-character words, allow partial matches
                     pattern = r'\b' + re.escape(word) + r'\w*'
-                    matches = re.findall(pattern, text_lower)
-                    matched_words.extend(matches)
+                matches = re.findall(pattern, text_lower)
+                matched_words.extend(matches)
             
             results.append({
                 'order_code': order_code,
@@ -250,11 +254,12 @@ def perform_catalog_fuzzy_search(query, catalog_df, top_k):
                 'fuzzy_score': round(max_score / 100, 3),
                 'match_type': 'catalog_fuzzy',
                 'match_field': 'description' if desc_score > code_score else 'order_code',
-                'matched_words': ' '.join(set(matched_words)) if matched_words else 'combined'
+                'matched_words': ' '.join(set(matched_words)) if matched_words else 'combined',
+                'matched_word_count': len(set(matched_words)) if matched_words else 0
             })
     
-    # Sort by fuzzy score (highest first) and return top_k
-    results.sort(key=lambda x: x['fuzzy_score'], reverse=True)
+    # Sort by matched word count first (highest first), then by fuzzy score (highest first)
+    results.sort(key=lambda x: (x['matched_word_count'], x['fuzzy_score']), reverse=True)
     return results[:top_k]
 
 @app.route('/api/database_info')
@@ -835,6 +840,79 @@ def delete_training_row():
         return jsonify({
             'success': False,
             'error': f'Failed to delete training row: {str(e)}'
+        }), 500
+
+@app.route('/api/training_data/clear_all', methods=['POST'])
+def clear_all_training_data():
+    """Clear all training data and reset models."""
+    global search_matcher
+    try:
+        # Try database deletion first
+        try:
+            TrainingData.clear_all()
+            print("✅ Cleared all training data from database")
+            
+            # Reset the fast search matcher
+            if search_matcher:
+                print("🔄 Resetting search matcher...")
+                from src.search import FastProductMatcher
+                search_matcher = FastProductMatcher()
+                # Initialize with empty dataframe
+                import pandas as pd
+                search_matcher.training_data = pd.DataFrame(columns=['Customer Query', 'Order Code', 'Description'])
+                search_matcher.load_data_and_prepare()
+                search_matcher.save_model()
+                print("✅ Search matcher reset with empty data")
+            
+            return jsonify({
+                'success': True,
+                'message': 'Successfully cleared all training data and reset models',
+                'remaining_rows': 0,
+                'storage': 'database',
+                'model_reset': True
+            })
+            
+        except Exception as db_error:
+            print(f"Database clear failed: {db_error}")
+            # Fallback to file-based clearing
+            from src.utils import get_training_csv_path
+            import pandas as pd
+            
+            # Create empty dataframe and save
+            empty_df = pd.DataFrame(columns=['Customer Query', 'Order Code', 'Description'])
+            
+            try:
+                training_path = get_training_csv_path()
+                if training_path != "REMOTE_TRAINING_DATA":
+                    empty_df.to_csv(training_path, index=False)
+                    print("✅ Cleared all training data from local file")
+            except Exception as e:
+                print(f"⚠️ Could not clear local file: {e}")
+            
+            # Reset the fast search matcher
+            if search_matcher:
+                print("🔄 Resetting search matcher (file fallback)...")
+                from src.search import FastProductMatcher
+                search_matcher = FastProductMatcher()
+                search_matcher.training_data = empty_df
+                search_matcher.load_data_and_prepare()
+                search_matcher.save_model()
+                print("✅ Search matcher reset with empty data (file fallback)")
+            
+            return jsonify({
+                'success': True,
+                'message': 'Successfully cleared all training data and reset models (file fallback)',
+                'remaining_rows': 0,
+                'storage': 'file_fallback',
+                'model_reset': True
+            })
+        
+    except Exception as e:
+        print(f"Clear all training data error: {e}")
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': f'Failed to clear training data: {str(e)}'
         }), 500
 
 @app.route('/training')
