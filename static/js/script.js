@@ -60,24 +60,35 @@ async function performSearch() {
     hideAllSections();
     
     try {
-        const response = await fetch('/api/search', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                query: query,
-                top_k: topK
+        // Perform both searches simultaneously
+        const [trainingResponse, catalogResponse] = await Promise.all([
+            fetch('/api/search', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    query: query,
+                    top_k: topK
+                })
+            }),
+            fetch('/api/catalog_search', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    query: query,
+                    top_k: topK
+                })
             })
-        });
+        ]);
         
-        const data = await response.json();
+        const trainingData = await trainingResponse.json();
+        const catalogData = await catalogResponse.json();
         
-        if (data.success) {
-            displayResults(data);
-        } else {
-            showError(data.error || 'Search failed');
-        }
+        // Display results with both training and catalog data
+        displayCombinedResults(trainingData, catalogData, query);
         
     } catch (error) {
         console.error('Search error:', error);
@@ -87,49 +98,92 @@ async function performSearch() {
     }
 }
 
-// Display search results
-function displayResults(data) {
+// Display combined search results from training and catalog
+function displayCombinedResults(trainingData, catalogData, query) {
     hideAllSections();
     
-    if (data.results.length === 0) {
+    const hasTrainingResults = trainingData.success && trainingData.results.length > 0;
+    const hasCatalogResults = catalogData.success && catalogData.results.length > 0;
+    
+    if (!hasTrainingResults && !hasCatalogResults) {
         showError('No results found for your query. Try different keywords or check spelling.');
         return;
     }
     
     // Update results metadata
+    const totalTime = Math.max(
+        trainingData.success ? trainingData.search_time : 0,
+        catalogData.success ? catalogData.search_time : 0
+    );
+    
     resultsMeta.innerHTML = `
         <div>
-            <strong>${data.total_results}</strong> results found in <strong>${data.search_time}s</strong>
+            Search completed in <strong>${totalTime.toFixed(3)}s</strong>
         </div>
         <div class="query-display">
-            Query: "<em>${escapeHtml(data.query)}</em>"
+            Query: "<em>${escapeHtml(query)}</em>"
         </div>
     `;
     
-    // Clear and populate results container
-    resultsContainer.innerHTML = '';
+    // Update tab counts
+    document.getElementById('trainingCount').textContent = hasTrainingResults ? trainingData.results.length : 0;
+    document.getElementById('catalogCount').textContent = hasCatalogResults ? catalogData.results.length : 0;
     
-    data.results.forEach((result, index) => {
-        const resultElement = createResultElement(result, index + 1);
-        resultsContainer.appendChild(resultElement);
-    });
+    // Clear and populate training results
+    resultsContainer.innerHTML = '';
+    if (hasTrainingResults) {
+        trainingData.results.forEach((result, index) => {
+            const resultElement = createResultElement(result, index + 1, 'training');
+            resultsContainer.appendChild(resultElement);
+        });
+        
+        // Fetch probability scores for training results
+        fetchProbabilityScores(query, trainingData.results);
+    } else {
+        resultsContainer.innerHTML = '<div class="no-results">No training matches found</div>';
+    }
+    
+    // Clear and populate catalog results
+    const catalogContainer = document.getElementById('catalogContainer');
+    catalogContainer.innerHTML = '';
+    if (hasCatalogResults) {
+        catalogData.results.forEach((result, index) => {
+            const resultElement = createResultElement(result, index + 1, 'catalog');
+            catalogContainer.appendChild(resultElement);
+        });
+    } else {
+        catalogContainer.innerHTML = '<div class="no-results">No catalog matches found</div>';
+    }
+    
+    // Setup results tab switching
+    setupResultsTabSwitching();
     
     // Show results section
     resultsSection.style.display = 'block';
     
     // Scroll to results
     resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    
-    // Fetch probability scores asynchronously
-    fetchProbabilityScores(data.query, data.results);
 }
 
 // Create individual result element
-function createResultElement(result, rank) {
+function createResultElement(result, rank, type = 'training') {
     const div = document.createElement('div');
-    const matchTypeClass = result.match_type === 'exact' ? 'exact-match' : 'fuzzy-match';
-    const matchIcon = result.match_type === 'exact' ? 'fas fa-star' : 'fas fa-chart-line';
-    const matchLabel = result.match_type === 'exact' ? 'EXACT MATCH' : 'FUZZY MATCH';
+    
+    let matchTypeClass, matchIcon, matchLabel, scoreDisplay;
+    
+    if (type === 'catalog') {
+        // Catalog results
+        matchTypeClass = 'catalog-match';
+        matchIcon = 'fas fa-database';
+        matchLabel = 'CATALOG MATCH';
+        scoreDisplay = `Fuzzy: ${result.fuzzy_score} | Field: ${result.match_field}`;
+    } else {
+        // Training results
+        matchTypeClass = result.match_type === 'exact' ? 'exact-match' : 'fuzzy-match';
+        matchIcon = result.match_type === 'exact' ? 'fas fa-star' : 'fas fa-chart-line';
+        matchLabel = result.match_type === 'exact' ? 'EXACT MATCH' : 'FUZZY MATCH';
+        scoreDisplay = `TF-IDF: ${result.tfidf_score} | Fuzzy: ${result.fuzzy_score} | Model: <span class="prob-score" data-order-code="${escapeHtml(result.order_code)}"><i class="fas fa-spinner fa-spin"></i></span>`;
+    }
     
     div.className = `result-item ${matchTypeClass}`;
     div.innerHTML = `
@@ -140,9 +194,15 @@ function createResultElement(result, rank) {
             <div class="result-actions">
                 <div class="result-score">
                     <i class="${matchIcon}"></i>
-                    ${matchLabel} (${result.probability})
+                    ${matchLabel} (${type === 'catalog' ? result.fuzzy_score : result.probability})
                 </div>
-                ${result.match_type !== 'exact' ? `
+                ${type === 'training' && result.match_type !== 'exact' ? `
+                    <button class="train-btn" onclick="addToTraining('${escapeHtml(result.order_code)}', '${escapeHtml(result.description)}')">
+                        <i class="fas fa-plus"></i>
+                        Add to Training
+                    </button>
+                ` : ''}
+                ${type === 'catalog' ? `
                     <button class="train-btn" onclick="addToTraining('${escapeHtml(result.order_code)}', '${escapeHtml(result.description)}')">
                         <i class="fas fa-plus"></i>
                         Add to Training
@@ -162,7 +222,7 @@ function createResultElement(result, rank) {
             <div class="detail-item">
                 <span class="detail-label">Scores</span>
                 <span class="detail-value">
-                    TF-IDF: ${result.tfidf_score} | Fuzzy: ${result.fuzzy_score} | Model: <span class="prob-score" data-order-code="${escapeHtml(result.order_code)}"><i class="fas fa-spinner fa-spin"></i></span>
+                    ${scoreDisplay}
                 </span>
             </div>
         </div>
@@ -320,6 +380,34 @@ function setupTabSwitching() {
             // Focus search input when switching to search tab
             if (targetTab === 'search') {
                 setTimeout(() => searchInput.focus(), 100);
+            }
+        });
+    });
+}
+
+// Setup results tab switching functionality
+function setupResultsTabSwitching() {
+    const resultsTabBtns = document.querySelectorAll('.results-tab-btn');
+    const resultsTabContents = document.querySelectorAll('.results-tab-content');
+    
+    resultsTabBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const targetTab = this.getAttribute('data-tab');
+            
+            // Remove active class from all tabs and contents
+            resultsTabBtns.forEach(b => b.classList.remove('active'));
+            resultsTabContents.forEach(content => content.classList.remove('active'));
+            
+            // Add active class to clicked tab
+            this.classList.add('active');
+            
+            // Show corresponding content
+            const targetContent = targetTab === 'training' ? 
+                document.getElementById('trainingResults') : 
+                document.getElementById('catalogResults');
+            
+            if (targetContent) {
+                targetContent.classList.add('active');
             }
         });
     });

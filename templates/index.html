@@ -131,8 +131,32 @@
                 <div class="results-meta" id="resultsMeta"></div>
             </div>
             
-            <div class="results-container" id="resultsContainer">
-                <!-- Results will be populated here -->
+            <!-- Results Tab Navigation -->
+            <div class="results-tab-nav" id="resultsTabNav">
+                <button class="results-tab-btn active" data-tab="training">
+                    <i class="fas fa-star"></i>
+                    Training Matches
+                    <span class="tab-count" id="trainingCount">0</span>
+                </button>
+                <button class="results-tab-btn" data-tab="catalog">
+                    <i class="fas fa-database"></i>
+                    Catalog Matches
+                    <span class="tab-count" id="catalogCount">0</span>
+                </button>
+            </div>
+            
+            <!-- Training Results Tab -->
+            <div class="results-tab-content active" id="trainingResults">
+                <div class="results-container" id="resultsContainer">
+                    <!-- Training results will be populated here -->
+                </div>
+            </div>
+            
+            <!-- Catalog Results Tab -->
+            <div class="results-tab-content" id="catalogResults">
+                <div class="results-container" id="catalogContainer">
+                    <!-- Catalog results will be populated here -->
+                </div>
             </div>
         </section>
 

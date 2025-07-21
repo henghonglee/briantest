@@ -148,6 +148,90 @@ def api_search():
             'error': f'Search failed: {str(e)}'
         }), 500
 
+@app.route('/api/catalog_search', methods=['POST'])
+def api_catalog_search():
+    """API endpoint for fuzzy search against full product catalog."""
+    try:
+        data = request.get_json()
+        query = data.get('query', '').strip()
+        top_k = min(data.get('top_k', 10), 50)  # Allow more results for catalog search
+        
+        if not query:
+            return jsonify({
+                'success': False,
+                'error': 'Query cannot be empty'
+            }), 400
+        
+        # Load catalog data
+        from src.utils import load_catalog_data
+        catalog_df = load_catalog_data()
+        
+        if catalog_df.empty:
+            return jsonify({
+                'success': False,
+                'error': 'Product catalog not available'
+            }), 503
+        
+        # Perform fuzzy search against catalog
+        start_time = time.time()
+        results = perform_catalog_fuzzy_search(query, catalog_df, top_k)
+        search_time = time.time() - start_time
+        
+        return jsonify({
+            'success': True,
+            'results': results,
+            'search_time': round(search_time, 3),
+            'query': query,
+            'total_results': len(results),
+            'catalog_size': len(catalog_df)
+        })
+        
+    except Exception as e:
+        print(f"Catalog search error: {e}")
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': f'Catalog search failed: {str(e)}'
+        }), 500
+
+def perform_catalog_fuzzy_search(query, catalog_df, top_k):
+    """Perform fuzzy search against the full product catalog."""
+    from rapidfuzz import fuzz
+    import pandas as pd
+    
+    results = []
+    query_lower = query.lower()
+    
+    # Search through descriptions and order codes
+    for idx, row in catalog_df.iterrows():
+        order_code = str(row.get('Order Code', ''))
+        description = str(row.get('Description', ''))
+        
+        # Skip empty entries
+        if not order_code or not description or order_code == 'nan' or description == 'nan':
+            continue
+        
+        # Calculate fuzzy scores
+        desc_score = fuzz.partial_ratio(query_lower, description.lower())
+        code_score = fuzz.partial_ratio(query_lower, order_code.lower())
+        
+        # Use the higher score
+        max_score = max(desc_score, code_score)
+        
+        # Only include results with reasonable similarity (>= 60%)
+        if max_score >= 60:
+            results.append({
+                'order_code': order_code,
+                'description': description,
+                'fuzzy_score': round(max_score / 100, 3),
+                'match_type': 'catalog_fuzzy',
+                'match_field': 'description' if desc_score > code_score else 'order_code'
+            })
+    
+    # Sort by fuzzy score (highest first) and return top_k
+    results.sort(key=lambda x: x['fuzzy_score'], reverse=True)
+    return results[:top_k]
+
 @app.route('/api/health')
 def health_check():
     """Health check endpoint."""
