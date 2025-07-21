@@ -84,6 +84,13 @@ def initialize_matcher():
         print("Initializing ProbabilisticProductMatcher...")
         prob_matcher = ProbabilisticProductMatcher()
         prob_matcher.load_model()
+        
+        # Train the model if it's not already trained
+        if not prob_matcher.is_trained:
+            print("⚠️ Probabilistic model not trained, training now...")
+            prob_matcher.train()
+            print("✅ Probabilistic model training completed")
+        
         print("✅ Probabilistic matcher initialized successfully")
         
         return True
