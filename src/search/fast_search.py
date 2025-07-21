@@ -89,12 +89,15 @@ class FastProductMatcher:
         exact_matches = []
         exact_match_indices = set()
         
+        print(f"🔍 Searching through {len(self.training_data)} training examples for query: '{query}'")
+        
         for idx, row in self.training_data.iterrows():
             training_query = row['Customer Query']
             training_query_clean = self.preprocess_text(training_query)
             
             # Check for exact match (case insensitive, normalized)
             if query_clean == training_query_clean:
+                print(f"🎯 Found exact match: '{training_query}' -> {row['Order Code']}")
                 exact_matches.append({
                     'order_code': row['Order Code'],
                     'description': row['Description'],
@@ -173,6 +176,33 @@ class FastProductMatcher:
         
         return deduplicated_results[:top_k]
     
+    def _rebuild_embeddings(self):
+        """Rebuild embeddings from current training data."""
+        if self.training_data is None or self.training_data.empty:
+            print("⚠️  No training data available for rebuilding embeddings")
+            return
+            
+        print(f"Rebuilding embeddings for {len(self.training_data)} training examples...")
+        
+        # Create embeddings from training queries
+        training_queries = []
+        for _, row in self.training_data.iterrows():
+            query = self.preprocess_text(row['Customer Query'])
+            training_queries.append(query)
+        
+        if training_queries:
+            # Fit TF-IDF and create embeddings from training queries
+            self.query_embeddings = self.tfidf_vectorizer.fit_transform(training_queries)
+            print(f"Created embeddings with shape: {self.query_embeddings.shape}")
+        else:
+            # No training data available, fit on dummy data
+            print("⚠️  No training queries available, using minimal setup...")
+            dummy_queries = ["default query"]
+            self.query_embeddings = self.tfidf_vectorizer.fit_transform(dummy_queries)
+            print("Created minimal embeddings setup")
+        
+        self.is_ready = True
+
     def save_model(self):
         """Save the model and embeddings."""
         model_data = {

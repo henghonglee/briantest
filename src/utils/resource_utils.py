@@ -68,7 +68,7 @@ def load_training_data():
     """Load training data from database, local file, or remote source."""
     # First try database
     try:
-        from models import TrainingData
+        from src.models.models import TrainingData
         df = TrainingData.get_all_as_dataframe()
         if len(df) > 0:
             print(f"📊 Loaded {len(df)} training examples from database")

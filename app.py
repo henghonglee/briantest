@@ -220,17 +220,263 @@ def perform_catalog_fuzzy_search(query, catalog_df, top_k):
         
         # Only include results with reasonable similarity (>= 60%)
         if max_score >= 60:
+            # Find the actual matched words
+            matched_text = description if desc_score > code_score else order_code
+            # Extract the matched words/phrases
+            import re
+            query_words = query_lower.split()
+            text_lower = matched_text.lower()
+            matched_words = []
+            for word in query_words:
+                if len(word) > 2:  # Skip very short words
+                    pattern = r'\b' + re.escape(word) + r'\w*'
+                    matches = re.findall(pattern, text_lower)
+                    matched_words.extend(matches)
+            
             results.append({
                 'order_code': order_code,
                 'description': description,
                 'fuzzy_score': round(max_score / 100, 3),
                 'match_type': 'catalog_fuzzy',
-                'match_field': 'description' if desc_score > code_score else 'order_code'
+                'match_field': 'description' if desc_score > code_score else 'order_code',
+                'matched_words': ' '.join(set(matched_words)) if matched_words else 'combined'
             })
     
     # Sort by fuzzy score (highest first) and return top_k
     results.sort(key=lambda x: x['fuzzy_score'], reverse=True)
     return results[:top_k]
+
+@app.route('/api/database_info')
+def database_info():
+    """Get database connection information."""
+    try:
+        from sqlalchemy import create_engine
+        from sqlalchemy.exc import OperationalError
+        
+        # Get database URL
+        database_url = os.getenv('DATABASE_URL', 'sqlite:///instance/training_data.db')
+        
+        # Determine database type
+        if database_url.startswith('postgresql://'):
+            db_type = 'PostgreSQL'
+        elif database_url.startswith('sqlite:///'):
+            db_type = 'SQLite'
+        elif database_url.startswith('mysql://'):
+            db_type = 'MySQL'
+        else:
+            db_type = 'Other'
+        
+        # Test connection
+        try:
+            engine = create_engine(database_url)
+            with engine.connect() as conn:
+                conn.execute("SELECT 1")
+            status = 'Connected'
+        except Exception:
+            status = 'Disconnected'
+        
+        # Clean connection string for display
+        connection_display = database_url
+        if 'password' in database_url.lower():
+            # Hide password in connection string
+            import re
+            connection_display = re.sub(r':[^@]+@', ':***@', connection_display)
+        elif database_url.startswith('sqlite:///'):
+            connection_display = database_url.replace('sqlite:///', '')
+        
+        return jsonify({
+            'success': True,
+            'database_type': db_type,
+            'connection_string': connection_display,
+            'status': status,
+            'full_connection': database_url
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/download_remote_training_data', methods=['POST'])
+def download_remote_training_data():
+    """Download training data from remote source and replace local data."""
+    try:
+        from src.utils.remote_data_loader import RemoteDataLoader
+        from src.models.models import TrainingData
+        
+        loader = RemoteDataLoader()
+        remote_data = loader.load_training_data()
+        
+        if remote_data is None or remote_data.empty:
+            return jsonify({
+                'success': False,
+                'error': 'No training data available from remote source'
+            }), 404
+        
+        # Clear existing training data
+        TrainingData.clear_all()
+        
+        # Add remote data to database
+        rows_added = 0
+        for _, row in remote_data.iterrows():
+            success = TrainingData.create(
+                customer_query=row['Customer Query'],
+                order_code=row['Order Code'],
+                description=row['Description']
+            )
+            if success:
+                rows_added += 1
+        
+        # Update search matcher and retrain models
+        if search_matcher and rows_added > 0:
+            df = TrainingData.get_all_as_dataframe()
+            search_matcher.training_data = df
+            search_matcher.load_data_and_prepare()
+            retrain_fast_search_model()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Downloaded {rows_added} training examples from remote source',
+            'rows_downloaded': rows_added
+        })
+        
+    except Exception as e:
+        print(f"Download remote training data error: {e}")
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': f'Failed to download remote training data: {str(e)}'
+        }), 500
+
+@app.route('/api/sync_remote_training_data', methods=['POST'])
+def sync_remote_training_data():
+    """Sync with remote training data, adding only new rows."""
+    try:
+        from src.utils.remote_data_loader import RemoteDataLoader
+        from src.models.models import TrainingData
+        
+        loader = RemoteDataLoader()
+        remote_data = loader.load_training_data()
+        
+        if remote_data is None or remote_data.empty:
+            return jsonify({
+                'success': False,
+                'error': 'No training data available from remote source'
+            }), 404
+        
+        # Get existing queries for deduplication
+        existing_queries = {
+            (row['customer_query'], row['order_code']) 
+            for row in TrainingData.get_all()
+        }
+        
+        # Add only new data
+        rows_added = 0
+        for _, row in remote_data.iterrows():
+            key = (row['Customer Query'], row['Order Code'])
+            if key not in existing_queries:
+                success = TrainingData.create(
+                    customer_query=row['Customer Query'],
+                    order_code=row['Order Code'],
+                    description=row['Description']
+                )
+                if success:
+                    rows_added += 1
+        
+        # Update search matcher and retrain models if new data added
+        if search_matcher and rows_added > 0:
+            df = TrainingData.get_all_as_dataframe()
+            search_matcher.training_data = df
+            search_matcher.load_data_and_prepare()
+            retrain_fast_search_model()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Synced with remote training data',
+            'rows_added': rows_added
+        })
+        
+    except Exception as e:
+        print(f"Sync remote training data error: {e}")
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': f'Failed to sync remote training data: {str(e)}'
+        }), 500
+
+@app.route('/api/model_files')
+def get_model_files():
+    """Get list of available model files for download."""
+    try:
+        import os
+        
+        model_files = []
+        model_dir = os.path.join(os.path.dirname(__file__), 'models')
+        
+        # Common model file extensions
+        model_extensions = ['.pkl', '.joblib', '.model', '.bin', '.json', '.csv']
+        
+        if os.path.exists(model_dir):
+            for filename in os.listdir(model_dir):
+                if any(filename.endswith(ext) for ext in model_extensions):
+                    file_path = os.path.join('models', filename)
+                    model_files.append({
+                        'name': filename,
+                        'url': f'/download/{file_path}',
+                        'path': file_path
+                    })
+        
+        # Add training data file
+        training_file = os.path.join(os.path.dirname(__file__), 'data', 'training_data.csv')
+        if os.path.exists(training_file):
+            model_files.append({
+                'name': 'training_data.csv',
+                'url': '/download/data/training_data.csv',
+                'path': 'data/training_data.csv'
+            })
+        
+        return jsonify({
+            'success': True,
+            'files': model_files
+        })
+        
+    except Exception as e:
+        print(f"Get model files error: {e}")
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/download/<path:filename>')
+def download_file(filename):
+    """Download any file from the server."""
+    try:
+        import os
+        from flask import send_file
+        
+        # Security: only allow downloads from specific directories
+        allowed_dirs = ['models', 'data', 'src/models', 'instance']
+        
+        file_path = os.path.join(os.path.dirname(__file__), filename)
+        
+        # Ensure file exists and is in allowed directory
+        if not os.path.exists(file_path):
+            return jsonify({'error': 'File not found'}), 404
+        
+        # Check if file is in allowed directory
+        file_dir = os.path.dirname(os.path.abspath(file_path))
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        
+        if not file_dir.startswith(base_dir):
+            return jsonify({'error': 'Access denied'}), 403
+        
+        return send_file(file_path, as_attachment=True)
+        
+    except Exception as e:
+        print(f"Download file error: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/health')
 def health_check():
@@ -243,6 +489,7 @@ def health_check():
 @app.route('/api/add_training', methods=['POST'])
 def add_training():
     """API endpoint to add training data."""
+    global search_matcher
     try:
         data = request.get_json()
         query = data.get('query', '').strip()
@@ -255,25 +502,62 @@ def add_training():
                 'error': 'Query, order code, and description are required'
             }), 400
         
-        if not search_matcher:
+        # Add to database first
+        try:
+            # Check for duplicates
+            existing = TrainingData.query.filter_by(
+                customer_query=query,
+                order_code=order_code
+            ).first()
+            
+            if existing:
+                return jsonify({
+                    'success': False,
+                    'error': f'Training example already exists: "{query}" -> "{order_code}"'
+                }), 400
+            
+            # Create new training record
+            new_record = TrainingData(
+                customer_query=query,
+                order_code=order_code,
+                description=description
+            )
+            
+            db.session.add(new_record)
+            db.session.commit()
+            print(f"✅ Added training example to database: '{query}' -> '{order_code}'")
+            
+        except Exception as db_error:
+            print(f"Database insert failed: {db_error}")
             return jsonify({
                 'success': False,
-                'error': 'Search service not available'
-            }), 503
-        
-        # Add the training example
-        success = search_matcher.add_training_example(query, order_code, description)
-        
-        if success:
-            return jsonify({
-                'success': True,
-                'message': f'Training example added successfully: "{query}" -> "{order_code}"'
-            })
-        else:
-            return jsonify({
-                'success': False,
-                'error': 'Failed to add training example'
+                'error': f'Failed to add training example to database: {str(db_error)}'
             }), 500
+        
+        # Update the search matcher with fresh data
+        if search_matcher:
+            try:
+                print("🔄 Updating search matcher with new training data...")
+                from src.search import FastProductMatcher
+                search_matcher = FastProductMatcher()
+                
+                # Load fresh data from database
+                df = TrainingData.get_all_as_dataframe()
+                print(f"📊 Loaded {len(df)} training examples including new one")
+                
+                search_matcher.training_data = df
+                search_matcher._rebuild_embeddings()
+                search_matcher.save_model()
+                print("✅ Search matcher updated successfully")
+                
+            except Exception as update_error:
+                print(f"⚠️ Warning: Failed to update search matcher: {update_error}")
+        
+        return jsonify({
+            'success': True,
+            'message': f'Training example added successfully: "{query}" -> "{order_code}"',
+            'model_updated': True
+        })
             
     except Exception as e:
         print(f"Add training error: {e}")
@@ -282,6 +566,28 @@ def add_training():
             'success': False,
             'error': f'Failed to add training data: {str(e)}'
         }), 500
+
+def retrain_fast_search_model():
+    """Retrain the fast search model after training data changes."""
+    try:
+        global search_matcher
+        
+        if search_matcher:
+            print("🔄 Retraining fast search model...")
+            # Get fresh data from database
+            df = TrainingData.get_all_as_dataframe()
+            search_matcher.training_data = df
+            search_matcher._rebuild_embeddings()
+            search_matcher.save_model()
+            print("✅ Fast search model retrained successfully")
+            return True
+        else:
+            print("❌ No search matcher available to retrain")
+            return False
+    except Exception as e:
+        print(f"❌ Failed to retrain fast search model: {e}")
+        traceback.print_exc()
+        return False
 
 @app.route('/api/probability_score', methods=['POST'])
 def probability_score():
@@ -502,6 +808,7 @@ def upload_training_data():
 @app.route('/api/training_data/delete', methods=['POST'])
 def delete_training_row():
     """Delete a specific row from training data."""
+    global search_matcher
     try:
         data = request.get_json()
         record_id = data.get('index') or data.get('id')
@@ -514,16 +821,40 @@ def delete_training_row():
         
         # Try database deletion first
         try:
+            # Check if record exists before deletion
+            record = TrainingData.query.get(record_id)
+            if record:
+                print(f"📋 Found record {record_id}: '{record.customer_query}' -> {record.order_code}")
+            
             success = TrainingData.delete_by_id(record_id)
             if success:
                 print(f"✅ Deleted record {record_id} from database")
                 
-                # Update the fast search matcher if available
+                # Update the fast search matcher and retrain models
                 if search_matcher:
+                    # Force a complete reload of the search matcher
+                    print("🔄 Forcing complete reload of search matcher...")
+                    
+                    from src.search import FastProductMatcher
+                    search_matcher = FastProductMatcher()
+                    
+                    # Load fresh data from database
                     df = TrainingData.get_all_as_dataframe()
+                    print(f"📊 Fresh training data loaded: {len(df)} rows")
+                    
+                    # Check if the deleted record is still in the dataframe
+                    if record:
+                        still_exists = df[df['Customer Query'] == record.customer_query]
+                        if not still_exists.empty:
+                            print(f"⚠️  WARNING: Deleted record still found in training data!")
+                        else:
+                            print(f"✅ Confirmed: Deleted record no longer in training data")
+                    
+                    # Set the training data and rebuild embeddings
                     search_matcher.training_data = df
-                    search_matcher.load_data_and_prepare()
-                    print("✅ Updated search matcher after row deletion")
+                    search_matcher._rebuild_embeddings()
+                    search_matcher.save_model()
+                    print("✅ Search matcher completely reloaded after row deletion")
                 
                 remaining_rows = TrainingData.get_total_count()
                 
@@ -531,8 +862,9 @@ def delete_training_row():
                     'success': True,
                     'message': f'Successfully deleted record {record_id}',
                     'remaining_rows': remaining_rows,
-                    'storage': 'database'
-                })
+                    'storage': 'database',
+                    'model_retrained': True
+})
             else:
                 return jsonify({
                     'success': False,
@@ -564,17 +896,24 @@ def delete_training_row():
             except Exception as e:
                 print(f"⚠️ Could not save to local file: {e}")
             
-            # Update the fast search matcher if available
+            # Update the fast search matcher and retrain models
             if search_matcher:
+                # Force a complete reload of the search matcher
+                print("🔄 Forcing complete reload of search matcher (file fallback)...")
+                
+                from src.search import FastProductMatcher
+                search_matcher = FastProductMatcher()
                 search_matcher.training_data = df
-                search_matcher.load_data_and_prepare()
-                print("✅ Updated search matcher after row deletion")
+                search_matcher._rebuild_embeddings()
+                search_matcher.save_model()
+                print("✅ Search matcher completely reloaded after row deletion (file fallback)")
             
             return jsonify({
                 'success': True,
                 'message': f'Successfully deleted row {row_index} (file fallback)',
                 'remaining_rows': len(df),
-                'storage': 'file_fallback'
+                'storage': 'file_fallback',
+                'model_retrained': True
             })
         
     except Exception as e:

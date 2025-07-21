@@ -176,7 +176,7 @@ function createResultElement(result, rank, type = 'training') {
         matchTypeClass = 'catalog-match';
         matchIcon = 'fas fa-database';
         matchLabel = 'CATALOG MATCH';
-        scoreDisplay = `Fuzzy: ${result.fuzzy_score} | Field: ${result.match_field}`;
+        scoreDisplay = `Matched: ${result.matched_words || result.match_field}`;
     } else {
         // Training results
         matchTypeClass = result.match_type === 'exact' ? 'exact-match' : 'fuzzy-match';

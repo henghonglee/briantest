@@ -152,14 +152,14 @@
         
         <div id="alertContainer"></div>
         
-        <div class="stats" id="stats">
-            <div class="stat-box">
-                <div class="stat-number" id="totalRows">-</div>
-                <div>Total Rows</div>
-            </div>
-            <div class="stat-box">
-                <div class="stat-number" id="lastUpdated">-</div>
-                <div>Last Updated</div>
+        
+        <div id="emptyDataActions" style="display: none; text-align: center; margin: 20px 0;">
+            <div class="alert alert-info">
+                <p>🚨 No training data found in database.</p>
+                <p>Download the latest training data from remote source to get started.</p>
+                <button class="btn btn-primary" onclick="downloadRemoteTrainingData()">
+                    📥 Download Remote Training Data
+                </button>
             </div>
         </div>
         
@@ -188,7 +188,9 @@
             <h2>📊 Browse & Manage Training Data</h2>
             <div style="margin-bottom: 15px;">
                 <button class="btn btn-primary" onclick="loadTrainingData()">🔄 Refresh Data</button>
-                <button class="btn btn-secondary" onclick="exportTrainingData()">📥 Export CSV</button>
+                <button class="btn btn-secondary" onclick="exportTrainingData()">📥 Export Training Data</button>
+                <button class="btn btn-info" onclick="downloadModelFiles()">📦 Download Model Files</button>
+                <button class="btn btn-warning" onclick="syncRemoteData()">🔄 Sync Remote Data</button>
             </div>
             
             <div class="loading" id="dataLoading">
@@ -212,6 +214,39 @@
                 </table>
             </div>
         </div>
+        
+        <!-- Stats Section at Bottom -->
+        <div class="section">
+            <div class="stats" id="stats">
+                <div class="stat-box">
+                    <div class="stat-number" id="totalRows">579</div>
+                    <div>Total Rows</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number" id="lastUpdated">17:18:02</div>
+                    <div>Last Updated</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Database Connection Info at Bottom -->
+        <div class="section">
+            <h2>🔧 Database Connection Info</h2>
+            <div class="stats" id="dbStats">
+                <div class="stat-box">
+                    <div class="stat-number" id="dbType">-</div>
+                    <div>Database Type</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number" id="dbPath">-</div>
+                    <div>Connection</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number" id="dbStatus">-</div>
+                    <div>Status</div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -222,6 +257,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             setupDragAndDrop();
             loadTrainingData();
+            loadDatabaseInfo();
         });
 
         function setupDragAndDrop() {
@@ -301,6 +337,7 @@
         function loadTrainingData() {
             document.getElementById('dataLoading').style.display = 'block';
             document.getElementById('tableContainer').style.display = 'none';
+            document.getElementById('emptyDataActions').style.display = 'none';
             
             fetch('/api/training_data')
             .then(response => response.json())
@@ -311,7 +348,14 @@
                     trainingData = data.data;
                     displayTrainingData(data.data);
                     updateStats(data.total_rows);
-                    document.getElementById('tableContainer').style.display = 'block';
+                    
+                    if (data.data.length === 0) {
+                        document.getElementById('emptyDataActions').style.display = 'block';
+                        document.getElementById('tableContainer').style.display = 'none';
+                    } else {
+                        document.getElementById('tableContainer').style.display = 'block';
+                        document.getElementById('emptyDataActions').style.display = 'none';
+                    }
                 } else {
                     showAlert(`❌ Failed to load training data: ${data.error}`, 'error');
                 }
@@ -415,6 +459,110 @@
             setTimeout(() => {
                 alert.remove();
             }, 5000);
+        }
+
+        function loadDatabaseInfo() {
+            fetch('/api/database_info')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('dbType').textContent = data.database_type;
+                        document.getElementById('dbPath').textContent = data.connection_string;
+                        document.getElementById('dbStatus').textContent = data.status;
+                        
+                        // Color code based on status
+                        const statusEl = document.getElementById('dbStatus');
+                        if (data.status === 'Connected') {
+                            statusEl.style.color = '#28a745';
+                        } else {
+                            statusEl.style.color = '#dc3545';
+                        }
+                    } else {
+                        document.getElementById('dbType').textContent = 'Error';
+                        document.getElementById('dbPath').textContent = 'Unable to connect';
+                        document.getElementById('dbStatus').textContent = 'Failed';
+                        document.getElementById('dbStatus').style.color = '#dc3545';
+                    }
+                })
+                .catch(error => {
+                    console.error('Failed to load database info:', error);
+                    document.getElementById('dbType').textContent = 'Error';
+                    document.getElementById('dbPath').textContent = 'Check console';
+                    document.getElementById('dbStatus').textContent = 'Failed';
+                    document.getElementById('dbStatus').style.color = '#dc3545';
+                });
+        }
+
+        function downloadRemoteTrainingData() {
+            if (confirm('Download latest training data from remote source? This will replace any existing local training data.')) {
+                fetch('/api/download_remote_training_data', {
+                    method: 'POST'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showAlert(`✅ ${data.message} - Downloaded ${data.rows_downloaded} rows`, 'success');
+                        loadTrainingData();
+                    } else {
+                        showAlert(`❌ Failed to download remote training data: ${data.error}`, 'error');
+                    }
+                })
+                .catch(error => {
+                    showAlert(`❌ Download failed: ${error.message}`, 'error');
+                });
+            }
+        }
+
+        function syncRemoteData() {
+            if (confirm('Sync with remote training data? This will merge new data with existing data.')) {
+                fetch('/api/sync_remote_training_data', {
+                    method: 'POST'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showAlert(`✅ ${data.message} - Added ${data.rows_added} new rows`, 'success');
+                        loadTrainingData();
+                    } else {
+                        showAlert(`❌ Sync failed: ${data.error}`, 'error');
+                    }
+                })
+                .catch(error => {
+                    showAlert(`❌ Sync failed: ${error.message}`, 'error');
+                });
+            }
+        }
+
+        function downloadModelFiles() {
+            fetch('/api/model_files')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Create a zip file with all model files
+                        const files = data.files;
+                        if (files.length === 0) {
+                            showAlert('❌ No model files found to download', 'info');
+                            return;
+                        }
+                        
+                        // Download each file
+                        files.forEach(file => {
+                            const a = document.createElement('a');
+                            a.href = file.url;
+                            a.download = file.name;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                        });
+                        
+                        showAlert(`✅ Downloading ${files.length} model files...`, 'success');
+                    } else {
+                        showAlert(`❌ Failed to get model files: ${data.error}`, 'error');
+                    }
+                })
+                .catch(error => {
+                    showAlert(`❌ Failed to get model files: ${error.message}`, 'error');
+                });
         }
 
         function escapeHtml(text) {
