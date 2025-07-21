@@ -23,14 +23,18 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
 # Database configuration
 DATABASE_URL = os.environ.get('DATABASE_URL')
+ENVIRONMENT = os.environ.get('ENVIRONMENT', 'development')
+
 if DATABASE_URL:
-    # Handle Render.com PostgreSQL URL format
+    # Production: Use PostgreSQL from environment variable
     if DATABASE_URL.startswith('postgres://'):
         DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
     app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
+    print(f"🐘 Using PostgreSQL database in {ENVIRONMENT} environment")
 else:
-    # Local development fallback
+    # Development: Use SQLite
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///training_data.db'
+    print(f"📄 Using SQLite database in {ENVIRONMENT} environment")
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
