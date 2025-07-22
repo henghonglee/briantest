@@ -1006,20 +1006,34 @@ def process_excel():
                                 results = search_matcher.search_fast(query_str, top_k=1)
                                 if results:
                                     best_result = results[0]
-                                    processed_df.loc[idx, order_code_col] = best_result['order_code']
-                                    processed_df.loc[idx, description_col] = best_result['description']
                                     
-                                    # Determine match type and score
-                                    match_type = best_result.get('match_type', 'fuzzy')
-                                    score = best_result.get('probability', 0)
+                                    # Validate that both order_code and description have values
+                                    result_order_code = best_result.get('order_code', '').strip()
+                                    result_description = best_result.get('description', '').strip()
                                     
-                                    if match_type == 'exact':
-                                        match_info = f"Exact Match (Score: {score:.3f})"
+                                    if result_order_code and result_description:
+                                        processed_df.loc[idx, order_code_col] = result_order_code
+                                        processed_df.loc[idx, description_col] = result_description
+                                        
+                                        # Determine match type and score
+                                        match_type = best_result.get('match_type', 'fuzzy')
+                                        score = best_result.get('probability', 0)
+                                        
+                                        if match_type == 'exact':
+                                            match_info = f"Exact Match (Score: {score:.3f})"
+                                        else:
+                                            match_info = f"Fuzzy Match (Score: {score:.3f})"
+                                        
+                                        processed_df.loc[idx, match_info_col] = match_info
+                                        total_queries_processed += 1
                                     else:
-                                        match_info = f"Fuzzy Match (Score: {score:.3f})"
-                                    
-                                    processed_df.loc[idx, match_info_col] = match_info
-                                    total_queries_processed += 1
+                                        # Handle case where order_code or description is missing
+                                        if result_order_code and not result_description:
+                                            processed_df.loc[idx, match_info_col] = "Invalid Match: Order code found but description missing"
+                                        elif not result_order_code and result_description:
+                                            processed_df.loc[idx, match_info_col] = "Invalid Match: Description found but order code missing"
+                                        else:
+                                            processed_df.loc[idx, match_info_col] = "Invalid Match: Both order code and description missing"
                                 else:
                                     processed_df.loc[idx, match_info_col] = "No Match Found"
                                     
