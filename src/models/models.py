@@ -8,6 +8,25 @@ from sqlalchemy.sql import func
 from datetime import datetime
 import pandas as pd
 
+
+def clean_corrupted_characters(text):
+    """Replace corrupted Unicode characters with proper equivalents."""
+    if isinstance(text, str):
+        # Replace Unicode replacement character (�) with dash for ranges
+        text = text.replace('�', '-')
+        # Replace other common corrupted characters
+        text = text.replace('\ufffd', '-')  # Another form of replacement character
+    return text
+
+
+def clean_dataframe_text(df):
+    """Clean corrupted characters in all text columns of a DataFrame."""
+    for col in df.columns:
+        if df[col].dtype == 'object':  # Text columns
+            df[col] = df[col].astype(str).apply(clean_corrupted_characters)
+    return df
+
+
 db = SQLAlchemy()
 
 class TrainingData(db.Model):
@@ -199,40 +218,3 @@ def init_db(app):
         print(f"📊 Current training data records: {total_records}")
 
 
-def migrate_csv_to_db(csv_path, app):
-    """Migrate existing CSV data to database."""
-    try:
-        with app.app_context():
-            # Check if we already have data
-            existing_count = TrainingData.get_total_count()
-            if existing_count > 0:
-                print(f"⚠️  Database already contains {existing_count} records")
-                return
-            
-            # Load CSV data
-            try:
-                import pandas as pd
-                # Try different encodings to handle various CSV file formats
-                encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
-                df = None
-                for encoding in encodings:
-                    try:
-                        df = pd.read_csv(csv_path, encoding=encoding)
-                        break
-                    except UnicodeDecodeError:
-                        continue
-                if df is None:
-                    # If all encodings fail, try with error handling
-                    df = pd.read_csv(csv_path, encoding='utf-8', errors='replace')
-                print(f"📁 Loaded {len(df)} records from {csv_path}")
-            except Exception as e:
-                print(f"❌ Could not load CSV file: {e}")
-                return
-            
-            # Insert into database
-            result = TrainingData.bulk_insert_from_dataframe(df, skip_duplicates=True)
-            print(f"✅ Migration complete: {result['added']} records added, {result['duplicates']} duplicates skipped")
-            
-    except Exception as e:
-        print(f"❌ Migration failed: {e}")
-        raise e

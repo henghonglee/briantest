@@ -7,6 +7,24 @@ from flask import Flask, render_template, request, jsonify
 from werkzeug.utils import secure_filename
 import pandas as pd
 import io
+
+
+def clean_corrupted_characters(text):
+    """Replace corrupted Unicode characters with proper equivalents."""
+    if isinstance(text, str):
+        # Replace Unicode replacement character (�) with dash for ranges
+        text = text.replace('�', '-')
+        # Replace other common corrupted characters
+        text = text.replace('\ufffd', '-')  # Another form of replacement character
+    return text
+
+
+def clean_dataframe_text(df):
+    """Clean corrupted characters in all text columns of a DataFrame."""
+    for col in df.columns:
+        if df[col].dtype == 'object':  # Text columns
+            df[col] = df[col].astype(str).apply(clean_corrupted_characters)
+    return df
 from src.search import FastProductMatcher, ProbabilisticProductMatcher
 from src.utils import config_manager
 import time
@@ -43,7 +61,7 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
 }
 
 # Initialize database and search matchers
-from src.models import db, init_db, TrainingData, migrate_csv_to_db
+from src.models import db, init_db, TrainingData
 db.init_app(app)
 
 search_matcher = None
@@ -656,6 +674,8 @@ def upload_training_data():
                 csv_content = file.read().decode('utf-8', errors='replace')
             
             new_df = pd.read_csv(io.StringIO(csv_content))
+            # Clean corrupted characters
+            new_df = clean_dataframe_text(new_df)
         except Exception as e:
             return jsonify({
                 'success': False,
@@ -1137,18 +1157,8 @@ try:
     with app.app_context():
         init_db(app)
         
-        # Migrate existing CSV data if database is empty
-        if TrainingData.get_total_count() == 0:
-            print("🔄 Database is empty, attempting CSV migration...")
-            try:
-                from src.utils import get_training_csv_path
-                training_path = get_training_csv_path()
-                if training_path != "REMOTE_TRAINING_DATA" and os.path.exists(training_path):
-                    migrate_csv_to_db(training_path, app)
-                else:
-                    print("⚠️  No local CSV file found for migration")
-            except Exception as migration_error:
-                print(f"⚠️  CSV migration failed: {migration_error}")
+        # Database initialized successfully
+        print("✅ Database initialization complete")
         
 except Exception as db_error:
     print(f"⚠️  Database initialization failed: {db_error}")

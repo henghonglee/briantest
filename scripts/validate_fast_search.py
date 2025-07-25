@@ -7,6 +7,24 @@ from fast_search import FastProductMatcher
 import pandas as pd
 import random
 
+
+def clean_corrupted_characters(text):
+    """Replace corrupted Unicode characters with proper equivalents."""
+    if isinstance(text, str):
+        # Replace Unicode replacement character (�) with dash for ranges
+        text = text.replace('�', '-')
+        # Replace other common corrupted characters
+        text = text.replace('\ufffd', '-')  # Another form of replacement character
+    return text
+
+
+def clean_dataframe_text(df):
+    """Clean corrupted characters in all text columns of a DataFrame."""
+    for col in df.columns:
+        if df[col].dtype == 'object':  # Text columns
+            df[col] = df[col].astype(str).apply(clean_corrupted_characters)
+    return df
+
 def test_exact_training_matches():
     """Test that exact training queries return the correct product using fast search."""
     matcher = FastProductMatcher()
@@ -27,6 +45,9 @@ def test_exact_training_matches():
     if training_data is None:
         # If all encodings fail, try with error handling
         training_data = pd.read_csv(csv_path, encoding='utf-8', errors='replace')
+    
+    # Clean corrupted characters
+    training_data = clean_dataframe_text(training_data)
     
     print("Testing exact matches from training data...")
     print("="*60)

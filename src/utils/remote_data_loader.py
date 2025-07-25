@@ -4,6 +4,24 @@ import os
 from io import StringIO
 import time
 
+
+def clean_corrupted_characters(text):
+    """Replace corrupted Unicode characters with proper equivalents."""
+    if isinstance(text, str):
+        # Replace Unicode replacement character (�) with dash for ranges
+        text = text.replace('�', '-')
+        # Replace other common corrupted characters
+        text = text.replace('\ufffd', '-')  # Another form of replacement character
+    return text
+
+
+def clean_dataframe_text(df):
+    """Clean corrupted characters in all text columns of a DataFrame."""
+    for col in df.columns:
+        if df[col].dtype == 'object':  # Text columns
+            df[col] = df[col].astype(str).apply(clean_corrupted_characters)
+    return df
+
 class RemoteDataLoader:
     def __init__(self):
         # GitHub raw URLs for data files
@@ -68,6 +86,9 @@ class RemoteDataLoader:
                 # Final fallback with error replacement
                 df = pd.read_csv(StringIO(csv_content), encoding='utf-8', errors='replace')
             
+            # Clean corrupted characters
+            df = clean_dataframe_text(df)
+            
             # Cache the data
             self._cache[cache_key] = df
             self._cache_timestamps[cache_key] = time.time()
@@ -113,6 +134,9 @@ class RemoteDataLoader:
             if df is None:
                 # Final fallback with error replacement
                 df = pd.read_csv(StringIO(csv_content), encoding='utf-8', errors='replace')
+            
+            # Clean corrupted characters
+            df = clean_dataframe_text(df)
             
             # Cache the data
             self._cache[cache_key] = df

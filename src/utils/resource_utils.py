@@ -9,6 +9,26 @@ from .config_manager import config_manager
 from .remote_data_loader import remote_loader
 
 
+def clean_corrupted_characters(text):
+    """Replace corrupted Unicode characters with proper equivalents."""
+    if isinstance(text, str):
+        # Replace Unicode replacement character (�) with dash for ranges
+        text = text.replace('�', '-')
+        # Replace other common corrupted characters
+        text = text.replace('\ufffd', '-')  # Another form of replacement character
+    return text
+
+
+def clean_dataframe_text(df):
+    """Clean corrupted characters in all text columns of a DataFrame."""
+    import pandas as pd
+    
+    for col in df.columns:
+        if df[col].dtype == 'object':  # Text columns
+            df[col] = df[col].astype(str).apply(clean_corrupted_characters)
+    return df
+
+
 def get_resource_path(relative_path):
     """Get absolute path to resource, works for dev and for PyInstaller"""
     try:
@@ -72,7 +92,7 @@ def load_training_data():
         df = TrainingData.get_all_as_dataframe()
         if len(df) > 0:
             print(f"📊 Loaded {len(df)} training examples from database")
-            return df
+            return clean_dataframe_text(df)
     except Exception as e:
         print(f"⚠️  Database not available, trying fallback: {e}")
     
@@ -86,11 +106,13 @@ def load_training_data():
         encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
         for encoding in encodings:
             try:
-                return pd.read_csv(path, encoding=encoding)
+                df = pd.read_csv(path, encoding=encoding)
+                return clean_dataframe_text(df)
             except UnicodeDecodeError:
                 continue
         # If all encodings fail, try with error handling
-        return pd.read_csv(path, encoding='utf-8', errors='replace')
+        df = pd.read_csv(path, encoding='utf-8', errors='replace')
+        return clean_dataframe_text(df)
 
 
 def load_catalog_data():
@@ -104,11 +126,13 @@ def load_catalog_data():
         encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
         for encoding in encodings:
             try:
-                return pd.read_csv(path, encoding=encoding)
+                df = pd.read_csv(path, encoding=encoding)
+                return clean_dataframe_text(df)
             except UnicodeDecodeError:
                 continue
         # If all encodings fail, try with error handling
-        return pd.read_csv(path, encoding='utf-8', errors='replace')
+        df = pd.read_csv(path, encoding='utf-8', errors='replace')
+        return clean_dataframe_text(df)
 
 
 def get_fast_model_path():
