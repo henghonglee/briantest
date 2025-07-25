@@ -212,7 +212,18 @@ def migrate_csv_to_db(csv_path, app):
             # Load CSV data
             try:
                 import pandas as pd
-                df = pd.read_csv(csv_path)
+                # Try different encodings to handle various CSV file formats
+                encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
+                df = None
+                for encoding in encodings:
+                    try:
+                        df = pd.read_csv(csv_path, encoding=encoding)
+                        break
+                    except UnicodeDecodeError:
+                        continue
+                if df is None:
+                    # If all encodings fail, try with error handling
+                    df = pd.read_csv(csv_path, encoding='utf-8', errors='replace')
                 print(f"📁 Loaded {len(df)} records from {csv_path}")
             except Exception as e:
                 print(f"❌ Could not load CSV file: {e}")

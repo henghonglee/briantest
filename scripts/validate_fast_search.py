@@ -14,7 +14,19 @@ def test_exact_training_matches():
     
     # Load training data
     print("Loading training data...")
-    training_data = pd.read_csv("/Users/henghonglee/abb2/training/training.csv")
+    # Try different encodings to handle various CSV file formats
+    encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
+    training_data = None
+    csv_path = "/Users/henghonglee/abb2/training/training.csv"
+    for encoding in encodings:
+        try:
+            training_data = pd.read_csv(csv_path, encoding=encoding)
+            break
+        except UnicodeDecodeError:
+            continue
+    if training_data is None:
+        # If all encodings fail, try with error handling
+        training_data = pd.read_csv(csv_path, encoding='utf-8', errors='replace')
     
     print("Testing exact matches from training data...")
     print("="*60)

@@ -46,8 +46,27 @@ class RemoteDataLoader:
             print("📥 Downloading training data from remote storage...")
             csv_content = self._download_with_retry(self.training_url)
             
-            # Parse CSV content
-            df = pd.read_csv(StringIO(csv_content))
+            # Parse CSV content with encoding detection
+            # Try different encodings to handle various CSV file formats
+            encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
+            df = None
+            for encoding in encodings:
+                try:
+                    # For remote content, try decoding the content with different encodings
+                    if encoding != 'utf-8':
+                        # Re-encode to bytes and decode with target encoding
+                        csv_bytes = csv_content.encode('latin1')  # Safe encoding for bytes
+                        decoded_content = csv_bytes.decode(encoding)
+                    else:
+                        decoded_content = csv_content
+                    df = pd.read_csv(StringIO(decoded_content))
+                    break
+                except (UnicodeDecodeError, pd.errors.ParserError):
+                    continue
+            
+            if df is None:
+                # Final fallback with error replacement
+                df = pd.read_csv(StringIO(csv_content), encoding='utf-8', errors='replace')
             
             # Cache the data
             self._cache[cache_key] = df
@@ -73,8 +92,27 @@ class RemoteDataLoader:
             print("📥 Downloading catalog data from remote storage...")
             csv_content = self._download_with_retry(self.catalog_url)
             
-            # Parse CSV content
-            df = pd.read_csv(StringIO(csv_content))
+            # Parse CSV content with encoding detection
+            # Try different encodings to handle various CSV file formats
+            encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
+            df = None
+            for encoding in encodings:
+                try:
+                    # For remote content, try decoding the content with different encodings
+                    if encoding != 'utf-8':
+                        # Re-encode to bytes and decode with target encoding
+                        csv_bytes = csv_content.encode('latin1')  # Safe encoding for bytes
+                        decoded_content = csv_bytes.decode(encoding)
+                    else:
+                        decoded_content = csv_content
+                    df = pd.read_csv(StringIO(decoded_content))
+                    break
+                except (UnicodeDecodeError, pd.errors.ParserError):
+                    continue
+            
+            if df is None:
+                # Final fallback with error replacement
+                df = pd.read_csv(StringIO(csv_content), encoding='utf-8', errors='replace')
             
             # Cache the data
             self._cache[cache_key] = df

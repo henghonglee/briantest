@@ -82,7 +82,15 @@ def load_training_data():
         return remote_loader.load_training_data()
     else:
         import pandas as pd
-        return pd.read_csv(path)
+        # Try different encodings to handle various CSV file formats
+        encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
+        for encoding in encodings:
+            try:
+                return pd.read_csv(path, encoding=encoding)
+            except UnicodeDecodeError:
+                continue
+        # If all encodings fail, try with error handling
+        return pd.read_csv(path, encoding='utf-8', errors='replace')
 
 
 def load_catalog_data():
@@ -92,7 +100,15 @@ def load_catalog_data():
         return remote_loader.load_catalog_data()
     else:
         import pandas as pd
-        return pd.read_csv(path)
+        # Try different encodings to handle various CSV file formats
+        encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
+        for encoding in encodings:
+            try:
+                return pd.read_csv(path, encoding=encoding)
+            except UnicodeDecodeError:
+                continue
+        # If all encodings fail, try with error handling
+        return pd.read_csv(path, encoding='utf-8', errors='replace')
 
 
 def get_fast_model_path():

@@ -637,9 +637,24 @@ def upload_training_data():
                 'error': 'Only CSV files are allowed'
             }), 400
         
-        # Read the uploaded CSV
+        # Read the uploaded CSV with encoding detection
         try:
-            csv_content = file.read().decode('utf-8')
+            # Try different encodings to handle various CSV file formats
+            encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
+            csv_content = None
+            for encoding in encodings:
+                try:
+                    file.seek(0)  # Reset file pointer
+                    csv_content = file.read().decode(encoding)
+                    break
+                except UnicodeDecodeError:
+                    continue
+            
+            if csv_content is None:
+                # Final fallback with error replacement
+                file.seek(0)
+                csv_content = file.read().decode('utf-8', errors='replace')
+            
             new_df = pd.read_csv(io.StringIO(csv_content))
         except Exception as e:
             return jsonify({
