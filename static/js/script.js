@@ -195,6 +195,12 @@ function createResultElement(result, rank, type = 'training') {
                     <i class="${matchIcon}"></i>
                     ${matchLabel} (${type === 'catalog' ? result.fuzzy_score : result.probability})
                 </div>
+                ${type === 'training' && result.match_type === 'exact' ? `
+                    <button class="remove-btn" onclick="removeFromTraining('${escapeHtml(result.order_code)}', '${escapeHtml(result.description)}')">
+                        <i class="fas fa-trash"></i>
+                        Remove from Training
+                    </button>
+                ` : ''}
                 ${type === 'training' && result.match_type !== 'exact' ? `
                     <button class="train-btn" onclick="addToTraining('${escapeHtml(result.order_code)}', '${escapeHtml(result.description)}')">
                         <i class="fas fa-plus"></i>
@@ -304,6 +310,65 @@ async function fetchProbabilityScores(query, results) {
         document.querySelectorAll('.prob-score').forEach(element => {
             element.innerHTML = `<span style="color: #d13438;">N/A</span>`;
         });
+    }
+}
+
+// Remove training example
+async function removeFromTraining(orderCode, description) {
+    const query = searchInput.value.trim();
+    
+    if (!query) {
+        alert('No search query available to identify training record');
+        return;
+    }
+    
+    if (confirm(`Remove this training example?\n\nQuery: "${query}"\nResult: ${orderCode}\n\nThis will remove the exact match from the training set.`)) {
+        try {
+            // First, we need to find the training record ID that matches this query and order code
+            const trainingResponse = await fetch('/api/training_data');
+            const trainingData = await trainingResponse.json();
+            
+            if (!trainingData.success) {
+                alert('Failed to load training data to find record');
+                return;
+            }
+            
+            // Find the matching record
+            const matchingRecord = trainingData.data.find(record => 
+                record.customer_query.toLowerCase().trim() === query.toLowerCase().trim() && 
+                record.order_code.toLowerCase().trim() === orderCode.toLowerCase().trim()
+            );
+            
+            if (!matchingRecord) {
+                alert('Could not find matching training record to remove');
+                return;
+            }
+            
+            // Delete the record
+            const deleteResponse = await fetch('/api/training_data/delete', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    id: matchingRecord.id
+                })
+            });
+            
+            const deleteData = await deleteResponse.json();
+            
+            if (deleteData.success) {
+                alert('Training example removed successfully! The model has been updated.');
+                // Refresh search results to reflect the change
+                performSearch();
+            } else {
+                alert(`Failed to remove training example: ${deleteData.error}`);
+            }
+            
+        } catch (error) {
+            console.error('Remove training error:', error);
+            alert('Network error. Could not remove training example.');
+        }
     }
 }
 
