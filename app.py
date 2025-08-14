@@ -31,6 +31,8 @@ import time
 import traceback
 import logging
 import os
+import gc
+import psutil
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -38,6 +40,25 @@ load_dotenv()
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+
+# Memory monitoring for free tier
+def check_memory_usage():
+    """Check current memory usage and log if high."""
+    try:
+        process = psutil.Process(os.getpid())
+        memory_info = process.memory_info()
+        memory_mb = memory_info.rss / 1024 / 1024
+        if memory_mb > 400:  # Warn if using >400MB on 512MB limit
+            print(f"⚠️ High memory usage: {memory_mb:.1f}MB")
+            gc.collect()  # Force garbage collection
+        return memory_mb
+    except Exception:
+        return 0
+
+# Add memory cleanup after heavy operations
+def cleanup_memory():
+    """Force garbage collection to free memory."""
+    gc.collect()
 
 # Database configuration
 DATABASE_URL = os.environ.get('DATABASE_URL')
@@ -143,10 +164,16 @@ def api_search():
                 'error': 'Search service not available'
             }), 503
         
+        # Check memory before search
+        check_memory_usage()
+        
         # Perform search
         start_time = time.time()
         results = search_matcher.search_fast(query, top_k)
         search_time = time.time() - start_time
+        
+        # Cleanup after search
+        cleanup_memory()
         
         # Format results for frontend
         formatted_results = []
